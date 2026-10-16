@@ -28,6 +28,8 @@ class PointLabelItem(GeoItem):
         # offset: vector từ scenePos(point) → scenePos(label-baseline-left)
         self._offset = QPointF(offset) if offset else QPointF(9, -11)
         self._moving_by_point = False   # guard: programmatic move
+        self._font_family = "Times New Roman"
+        self._font_size   = 13
 
         # Không dùng ItemIsMovable vì SelectTool dùng setPos() trực tiếp.
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable,         True)
@@ -50,6 +52,31 @@ class PointLabelItem(GeoItem):
         self._text = value
         self._point.label = value    # keep point.label in sync
         self.update()
+
+    # ── Font / cỡ chữ ────────────────────────────────────────────────────
+
+    @property
+    def font_family(self) -> str:
+        return self._font_family
+
+    @property
+    def font_size(self) -> int:
+        return self._font_size
+
+    def style_state(self) -> tuple:
+        """(text, family, size) — dùng cho undo/redo."""
+        return (self._text, self._font_family, self._font_size)
+
+    def apply_style_state(self, state: tuple):
+        text, family, size = state
+        self.prepareGeometryChange()
+        self._font_family = family
+        self._font_size   = max(6, min(96, int(size)))
+        self.text = text
+
+    def _max_dist(self) -> float:
+        # Chữ to thì cho phép đặt nhãn xa điểm hơn
+        return MAX_DIST * max(1.0, self._font_size / 13.0)
 
     # ── Sync với điểm cha ────────────────────────────────────────────────
 
@@ -102,8 +129,9 @@ class PointLabelItem(GeoItem):
             d   = math.sqrt(dx * dx + dy * dy)
             if d < 1e-9:
                 return value
-            if d > MAX_DIST:
-                s  = MAX_DIST / d
+            max_d = self._max_dist()
+            if d > max_d:
+                s  = max_d / d
                 dx *= s; dy *= s
             elif d < MIN_DIST:
                 s  = MIN_DIST / d
@@ -124,9 +152,8 @@ class PointLabelItem(GeoItem):
 
     # ── Vẽ ───────────────────────────────────────────────────────────────
 
-    @staticmethod
-    def _font() -> QFont:
-        f = QFont("Times New Roman", 13)
+    def _font(self) -> QFont:
+        f = QFont(self._font_family, self._font_size)
         f.setItalic(True)
         return f
 

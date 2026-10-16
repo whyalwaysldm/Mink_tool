@@ -169,7 +169,15 @@ class SelectTool(BaseTool):
             self._reset()
 
     def double_click(self, pos: QPointF):
-        """Double-click cũng cycle như single-click."""
+        """Double-click vào nhãn → sửa font / cỡ chữ; còn lại cycle như single-click."""
+        from items.label import LabelItem
+        from items.point_label import PointLabelItem
+        for it in self._geo_items_at(pos):
+            if isinstance(it, (LabelItem, PointLabelItem)):
+                self._reset()
+                from ui.label_dialog import edit_label
+                edit_label(it, self.scene, self.history)
+                return
         self._select_at(pos, Qt.KeyboardModifier.NoModifier)
 
     def move(self, pos: QPointF, modifiers):
@@ -202,6 +210,12 @@ class SelectTool(BaseTool):
             self._reset_cycle()
         elif key == Qt.Key.Key_H:
             self._toggle_hidden()
+        elif key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal,
+                     Qt.Key.Key_Minus, Qt.Key.Key_Underscore):
+            # +/− → đổi cỡ chữ các nhãn đang chọn
+            from ui.label_dialog import resize_labels
+            step = 1 if key in (Qt.Key.Key_Plus, Qt.Key.Key_Equal) else -1
+            resize_labels(self.scene.selectedItems(), step, self.history)
 
     def _toggle_hidden(self):
         """

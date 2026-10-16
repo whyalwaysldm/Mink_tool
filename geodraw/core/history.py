@@ -69,6 +69,21 @@ class _MoveCmd(QUndoCommand):
         self.item.setPos(self.old_pos)
 
 
+class _LabelStyleCmd(QUndoCommand):
+    """Đổi nội dung / font / cỡ chữ của nhãn."""
+    def __init__(self, item, old_state, new_state):
+        super().__init__("Label style")
+        self.item = item
+        self.old_state = old_state
+        self.new_state = new_state
+
+    def redo(self):
+        self.item.apply_style_state(self.new_state)
+
+    def undo(self):
+        self.item.apply_style_state(self.old_state)
+
+
 class History:
     def __init__(self):
         self._stack = QUndoStack()
@@ -99,6 +114,10 @@ class History:
 
     def push_move(self, item, old_pos, new_pos):
         self._stack.push(_MoveCmd(item, old_pos, new_pos))
+
+    def push_label_style(self, item, old_state, new_state):
+        if old_state != new_state:
+            self._stack.push(_LabelStyleCmd(item, old_state, new_state))
 
     def can_undo(self) -> bool:
         return self._stack.canUndo()

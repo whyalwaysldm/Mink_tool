@@ -1,3 +1,3 @@
 @echo off
-"D:\Python\python.exe" "E:\Tài liệu toán\Mink tool\geodraw\main.py"
-pause
+rem Goi file chay chinh o thu muc cha (khong dung duong dan co dinh)
+call "%~dp0..\Chạy GeoDraw.bat"

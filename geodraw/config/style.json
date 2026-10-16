@@ -1,0 +1,17 @@
+{
+  "current": "Nhỏ",
+  "presets": {
+    "Nhỏ": {
+      "point_radius": 1.0,
+      "stroke_width": 1.0
+    },
+    "Vừa": {
+      "point_radius": 3.5,
+      "stroke_width": 1.8
+    },
+    "To": {
+      "point_radius": 5.0,
+      "stroke_width": 3.0
+    }
+  }
+}

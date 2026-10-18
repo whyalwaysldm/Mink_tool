@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QDockWidget, QWidget, QVBoxLayout, QHBoxLayout,
                               QLabel, QPushButton, QSlider, QColorDialog,
-                              QDoubleSpinBox)
+                              QDoubleSpinBox, QSpinBox, QFontComboBox)
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtCore import Qt
 from items.base import GeoItem
@@ -54,6 +54,33 @@ class PropertiesPanel(QDockWidget):
         h3.addWidget(self._ink_spin)
         lay.addLayout(h3)
 
+        # ── Chữ của nhãn: font + cỡ chữ ───────────────────────────────
+        # Áp dụng cho nhãn đang chọn; không chọn gì → mặc định cho nhãn mới
+        self.addSeparator_()
+        from config.app_settings import AppSettings
+        from items.label import MIN_FONT_SIZE, MAX_FONT_SIZE
+        _s = AppSettings.load()
+        self._updating_font = False
+        lay.addWidget(QLabel("Chữ (nhãn):"))
+        self._font_combo = QFontComboBox()
+        self._font_combo.setCurrentFont(QFont(_s.label_font_family))
+        self._font_combo.setToolTip(
+            "Font của nhãn đang chọn\n(không chọn nhãn nào → font cho nhãn mới)")
+        self._font_combo.currentFontChanged.connect(self._apply_label_font)
+        lay.addWidget(self._font_combo)
+        h_fs = QHBoxLayout()
+        h_fs.addWidget(QLabel("Cỡ chữ:"))
+        self._font_size_spin = QSpinBox()
+        self._font_size_spin.setRange(MIN_FONT_SIZE, MAX_FONT_SIZE)
+        self._font_size_spin.setValue(_s.label_font_size)
+        self._font_size_spin.setSuffix(" pt")
+        self._font_size_spin.setToolTip(
+            "Cỡ chữ của nhãn đang chọn (phím tắt: + / −)\n"
+            "(không chọn nhãn nào → cỡ chữ cho nhãn mới)")
+        self._font_size_spin.valueChanged.connect(self._apply_label_font)
+        h_fs.addWidget(self._font_size_spin)
+        lay.addLayout(h_fs)
+
         # ── Ẩn / Hiện ──────────────────────────────────────────────────
         self.addSeparator_()
         h_vis = QHBoxLayout()
@@ -94,6 +121,8 @@ class PropertiesPanel(QDockWidget):
         for it in self._scene.selectedItems():
             if isinstance(it, GeoItem):
                 it.color = QColor(color)
+                if hasattr(it, "_text_item"):        # LabelItem
+                    it._text_item.setDefaultTextColor(QColor(color))
                 it.update()
         ink = self._tm.all_tools().get("ink")
         if ink:
@@ -109,6 +138,29 @@ class PropertiesPanel(QDockWidget):
         ink = self._tm.all_tools().get("ink")
         if ink:
             ink.base_width = val
+
+    def _selected_labels(self) -> list:
+        return [it for it in self._scene.selectedItems()
+                if hasattr(it, "apply_style_state")]
+
+    def _apply_label_font(self, *_):
+        if self._updating_font:
+            return
+        family = self._font_combo.currentFont().family()
+        size = self._font_size_spin.value()
+        labels = self._selected_labels()
+        history = getattr(self._tm, '_history', None)
+        for it in labels:
+            old = it.style_state()
+            new = (old[0], family, size)
+            if history:
+                history.push_label_style(it, old, new)
+            else:
+                it.apply_style_state(new)
+        from items.point_label import PointLabelItem
+        if not labels or not all(isinstance(it, PointLabelItem) for it in labels):
+            from ui.label_dialog import remember_label_font
+            remember_label_font(family, size)
 
     def _on_hide_btn(self):
         """Click nút Ẩn/Hiện trong panel."""
@@ -135,6 +187,13 @@ class PropertiesPanel(QDockWidget):
             self._hide_btn.setChecked(False)
             self._hide_btn.setText("👁  Ẩn")
             return
+        labels = self._selected_labels()
+        if labels:
+            _, family, size = labels[0].style_state()
+            self._updating_font = True
+            self._font_combo.setCurrentFont(QFont(family))
+            self._font_size_spin.setValue(size)
+            self._updating_font = False
         it = selected[0]
         if isinstance(it, GeoItem):
             self._set_btn_color(it.color)

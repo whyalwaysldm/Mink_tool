@@ -139,6 +139,9 @@ class GeoView(QGraphicsView):
             self._ghost.setVisible(False)
             if tool:
                 tool.tablet_press(scene_pos, pressure, event.button())
+                # Bút không sinh double-click → tự nhận chạm đúp
+                if self._is_pen_double_tap(event):
+                    tool.double_click(scene_pos)
         elif t == QEvent.Type.TabletMove:
             if event.buttons() == Qt.MouseButton.NoButton:
                 self._ghost.setVisible(True)
@@ -154,6 +157,24 @@ class GeoView(QGraphicsView):
             self._ghost.setVisible(True)
             if tool:
                 tool.tablet_release(scene_pos, pressure)
+
+    def _is_pen_double_tap(self, event) -> bool:
+        from PyQt6.QtCore import QElapsedTimer
+        from PyQt6.QtWidgets import QApplication
+        pos = event.position().toPoint()
+        last = getattr(self, "_last_tap", None)
+        is_double = (
+            last is not None and
+            last[0].elapsed() <= QApplication.doubleClickInterval() and
+            (pos - last[1]).manhattanLength() <= 12
+        )
+        if is_double:
+            self._last_tap = None
+        else:
+            timer = QElapsedTimer()
+            timer.start()
+            self._last_tap = (timer, pos)
+        return is_double
 
     # ── Mouse events ────────────────────────────────────────────────────
     def mousePressEvent(self, event):

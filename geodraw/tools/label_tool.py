@@ -1,5 +1,4 @@
 from PyQt6.QtCore import Qt, QPointF
-from PyQt6.QtWidgets import QDialog
 from .base_tool import BaseTool
 from items.label import LabelItem
 from items.point_label import PointLabelItem
@@ -10,7 +9,7 @@ _DRAG_THRESHOLD = 4.0
 
 class LabelTool(BaseTool):
     """
-    Click chỗ trống → tạo nhãn mới (chọn nội dung, font, cỡ chữ).
+    Click → đặt nhãn tự động A, B, C… (click vào điểm → đặt tên cho điểm).
     Kéo nhãn có sẵn → di chuyển nhãn.
     Double-click nhãn → sửa nội dung / font / cỡ chữ.
     + / − → tăng / giảm cỡ chữ nhãn đang chọn.
@@ -30,8 +29,8 @@ class LabelTool(BaseTool):
     def activate(self):
         self._reset()
         self.tm.status_hint.emit(
-            "Nhãn: click chỗ trống để tạo  |  kéo nhãn để di chuyển  |  "
-            "double-click để đổi font / cỡ chữ  |  +/− đổi cỡ chữ")
+            "Nhãn: click để đặt A, B, C…  |  kéo nhãn để di chuyển  |  "
+            "double-click để đổi tên / font / cỡ chữ  |  +/− đổi cỡ chữ")
 
     def deactivate(self):
         self._reset()
@@ -97,24 +96,39 @@ class LabelTool(BaseTool):
             return
         super().key_press(key, modifiers)
 
-    # ── Tạo nhãn mới ──────────────────────────────────────────────────
+    # ── Đặt nhãn mới: tự đánh A, B, C… ──────────────────────────────
+
+    def _next_name(self) -> str:
+        """Tên chưa dùng tiếp theo: A…Z, rồi A1…Z1, A2…"""
+        used = {pt.label for pt in self.scene.point_items() if pt.label}
+        used |= {it.text for it in self.scene.items()
+                 if isinstance(it, LabelItem)}
+        n = 0
+        while True:
+            suffix = str(n) if n else ""
+            for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+                if c + suffix not in used:
+                    return c + suffix
+            n += 1
 
     def _create_label(self, pos: QPointF):
-        from config.app_settings import AppSettings
-        from ui.label_dialog import LabelDialog, remember_label_font
-        s = AppSettings.load()
-        view = self.scene.views()[0] if self.scene.views() else None
-        dlg = LabelDialog(view, "Nhập nhãn", "",
-                          s.label_font_family, s.label_font_size)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-        text, family, size = dlg.values()
-        if not text:
-            return
-        remember_label_font(family, size)
-        lbl = LabelItem(text, pos, font_size=size, font_family=family)
-        self.scene.addItem(lbl)
-        self.history.push_add(self.scene, lbl)
+        from items.point import PointItem
+        name = self._next_name()
+        snapped_item, _ = self.scene.snap(pos)
+        if isinstance(snapped_item, PointItem):
+            point = snapped_item
+            if point._label_item is not None:
+                self.tm.status_hint.emit(
+                    f"Điểm đã có tên '{point.label}' — double-click nhãn để đổi")
+                return
+            point.label = name
+            item = PointLabelItem(point, name)
+        else:
+            item = LabelItem(name, pos)
+        self.scene.addItem(item)
+        self.history.push_add(self.scene, item)
+        self.tm.status_hint.emit(
+            f"✓ Đã đặt nhãn '{name}'  —  double-click để đổi tên / font / cỡ chữ")
 
 
 def _size_step(key) -> int:

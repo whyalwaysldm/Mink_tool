@@ -1,3 +1,5 @@
 {
-  "initial_zoom_percent": 200
+  "initial_zoom_percent": 200,
+  "label_font_family": "Times New Roman",
+  "label_font_size": 10
 }

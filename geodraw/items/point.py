@@ -10,10 +10,10 @@ class PointItem(GeoItem):
 
     def __init__(self, pos: QPointF, color=None):
         super().__init__(color)
-        self.setPos(pos)
         self.label: str = ""          # tên điểm (A, B, C …) — dùng bởi PointLabelItem
         self._label_item = None       # ref tới PointLabelItem hiện tại (nếu có)
-        self._dependents: list = []
+        self._dependents: list = []   # phải có trước setPos (itemChange dùng)
+        self.setPos(pos)
         # Radius lấy từ StyleManager tại thời điểm tạo điểm
         from core.style_manager import get_style_manager
         self._radius: float = get_style_manager().point_radius

@@ -84,6 +84,25 @@ class _LabelStyleCmd(QUndoCommand):
         self.item.apply_style_state(self.old_state)
 
 
+class _MoveGroupCmd(QUndoCommand):
+    """Di chuyển nhiều item cùng lúc (tắt ràng buộc hình mẫu khi undo/redo)."""
+    def __init__(self, moves: list):
+        super().__init__("Move items")
+        self.moves = list(moves)      # [(item, old_pos, new_pos)]
+
+    def _apply(self, idx):
+        from items.shape import constraints_suspended
+        with constraints_suspended():
+            for m in self.moves:
+                m[0].setPos(m[idx])
+
+    def redo(self):
+        self._apply(2)
+
+    def undo(self):
+        self._apply(1)
+
+
 class History:
     def __init__(self):
         self._stack = QUndoStack()
@@ -114,6 +133,14 @@ class History:
 
     def push_move(self, item, old_pos, new_pos):
         self._stack.push(_MoveCmd(item, old_pos, new_pos))
+
+    def push_move_group(self, moves: list):
+        """moves = [(item, old_pos, new_pos)] — 1 bước undo cho cả nhóm."""
+        moves = [m for m in moves if m[1] != m[2]]
+        if len(moves) == 1:
+            self.push_move(*moves[0])
+        elif moves:
+            self._stack.push(_MoveGroupCmd(moves))
 
     def push_label_style(self, item, old_state, new_state):
         if old_state != new_state:

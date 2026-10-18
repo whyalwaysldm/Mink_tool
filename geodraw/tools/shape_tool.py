@@ -3,7 +3,8 @@ from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtWidgets import QGraphicsPolygonItem
 from PyQt6.QtGui import QPen, QBrush, QColor, QPolygonF
 from .base_tool import BaseTool
-from items.fixed_polygon import FixedPolygonItem
+from items.point import PointItem
+from items.shape import ShapeItem
 
 
 def _dist(a: QPointF, b: QPointF) -> float:
@@ -72,9 +73,13 @@ class PresetShapeTool(BaseTool):
         if _dist(self._anchor, pos) > 5:
             pts = self.compute_vertices(self._anchor, pos)
             if pts and len(pts) >= 3:
-                item = FixedPolygonItem(pts)
-                self.scene.addItem(item)
-                self.history.push_add(self.scene, item)
+                # Dựng hình từ các điểm đỉnh — kéo đỉnh để đổi cỡ / xoay
+                vertices = [PointItem(p) for p in pts]
+                item = ShapeItem(vertices, self.shape_label)
+                self.history.push_add_batch(self.scene, vertices + [item])
+                self.tm.status_hint.emit(
+                    f"✓ {self.shape_label} — kéo một đỉnh (công cụ Chọn) để "
+                    "đổi kích thước / xoay; kéo thân hình để di chuyển")
         self._pressing = False
         self._anchor = None
         self._remove_ghost()

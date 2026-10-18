@@ -161,9 +161,16 @@ class SelectTool(BaseTool):
             self._dragging             = True
             self._did_drag             = False
             self._drag_start_mouse     = pos
+            # Hình mẫu (ShapeItem) di chuyển bằng cách kéo các đỉnh của nó
+            from items.shape import ShapeItem
+            drag_items = []
+            for it in self.scene.selectedItems():
+                if isinstance(it, ShapeItem):
+                    drag_items.extend(it.points)
+                else:
+                    drag_items.append(it)
             self._drag_start_positions = {
-                it: QPointF(it.pos())
-                for it in self.scene.selectedItems()
+                it: QPointF(it.pos()) for it in drag_items
             }
         else:
             self._reset()
@@ -188,14 +195,22 @@ class SelectTool(BaseTool):
         if delta.manhattanLength() < _DRAG_THRESHOLD:
             return
         self._did_drag = True
-        for item, start_pos in self._drag_start_positions.items():
-            item.setPos(start_pos + delta)
+        from items.shape import constraints_suspended
+        if len(self._drag_start_positions) > 1:
+            # Kéo cả khối → không áp ràng buộc hình mẫu
+            with constraints_suspended():
+                for item, start_pos in self._drag_start_positions.items():
+                    item.setPos(start_pos + delta)
+        else:
+            for item, start_pos in self._drag_start_positions.items():
+                item.setPos(start_pos + delta)
 
     def release(self, pos: QPointF, button):
         if self._dragging and self._did_drag:
             # Drag thật → lưu lịch sử di chuyển và reset cycle
-            for item, start_pos in self._drag_start_positions.items():
-                self.history.push_move(item, start_pos, item.pos())
+            self.history.push_move_group(
+                [(item, start_pos, QPointF(item.pos()))
+                 for item, start_pos in self._drag_start_positions.items()])
             self._reset_cycle()
         self._reset()
 

@@ -19,6 +19,7 @@ class SelectTool(BaseTool):
         self._drag_start_mouse: QPointF = None
         self._drag_start_positions: dict = {}
         self._did_drag             = False   # True khi đã vượt ngưỡng drag
+        self._stretch = None                 # (shape, edge, normal, {pt: start})
 
         # ── Trạng thái cycle ──────────────────────────────────────────
         self._cycle_pos:  QPointF = None   # vị trí click lần trước
@@ -36,6 +37,7 @@ class SelectTool(BaseTool):
         self._reset()
 
     def _reset(self):
+        self._stretch              = None
         self._dragging             = False
         self._did_drag             = False
         self._drag_start_mouse     = None
@@ -154,6 +156,9 @@ class SelectTool(BaseTool):
         if button != Qt.MouseButton.LeftButton:
             return
 
+        if self._begin_stretch(pos):
+            return
+
         found = self._select_at(pos, modifiers)
 
         if found:
@@ -187,7 +192,59 @@ class SelectTool(BaseTool):
                 return
         self._select_at(pos, Qt.KeyboardModifier.NoModifier)
 
+    # ── Kéo cạnh hình mẫu → kéo dãn (đổi tỉ lệ) ─────────────────────
+
+    def _begin_stretch(self, pos: QPointF) -> bool:
+        from items.shape import ShapeItem
+        from items.point import PointItem
+        view = self.scene.views()[0] if self.scene.views() else None
+        zoom = view.transform().m11() if view else 1.0
+        tol = 7.0 / (zoom or 1.0)
+        # Click trúng điểm → ưu tiên kéo điểm
+        if any(isinstance(it, PointItem) for it in self._geo_items_at(pos)):
+            return False
+        for it in self.scene.items():
+            if not (isinstance(it, ShapeItem) and it.stretch_edges):
+                continue
+            k = it.stretch_edge_at(pos, tol)
+            if k is None:
+                continue
+            n = len(it.points)
+            pts = (it.points[k], it.points[(k + 1) % n])
+            self.scene.clearSelection()
+            it.setSelected(True)
+            self._stretch = (it, k, it.edge_normal(k),
+                             {p: QPointF(p.pos()) for p in pts})
+            self._drag_start_mouse = QPointF(pos)
+            self._did_drag = False
+            self.tm.status_hint.emit(
+                f"{it.shape_label}: kéo cạnh để kéo dãn (đổi tỉ lệ)")
+            return True
+        return False
+
+    def _move_stretch(self, pos: QPointF):
+        from items.shape import constraints_suspended
+        shape, k, nrm, starts = self._stretch
+        delta = pos - self._drag_start_mouse
+        if not self._did_drag and delta.manhattanLength() < _DRAG_THRESHOLD:
+            return
+        self._did_drag = True
+        d = delta.x() * nrm.x() + delta.y() * nrm.y()
+        # Không cho cạnh vượt qua phía bên kia của hình
+        a = next(iter(starts.values()))
+        others = [p.scenePos() for p in shape.points if p not in starts]
+        depth = max(((a - o).x() * nrm.x() + (a - o).y() * nrm.y())
+                    for o in others) if others else 0.0
+        d = max(d, 5.0 - depth)
+        with constraints_suspended():
+            for p, start in starts.items():
+                p.setPos(start + nrm * d)
+        shape.sync()
+
     def move(self, pos: QPointF, modifiers):
+        if self._stretch is not None:
+            self._move_stretch(pos)
+            return
         if not self._dragging or self._drag_start_mouse is None:
             return
         delta = pos - self._drag_start_mouse
@@ -206,6 +263,13 @@ class SelectTool(BaseTool):
                 item.setPos(start_pos + delta)
 
     def release(self, pos: QPointF, button):
+        if self._stretch is not None:
+            if self._did_drag:
+                starts = self._stretch[3]
+                self.history.push_move_group(
+                    [(p, s, QPointF(p.pos())) for p, s in starts.items()])
+            self._reset()
+            return
         if self._dragging and self._did_drag:
             # Drag thật → lưu lịch sử di chuyển và reset cycle
             self.history.push_move_group(

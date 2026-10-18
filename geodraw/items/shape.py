@@ -29,10 +29,14 @@ def constraints_suspended():
 class ShapeItem(GeoItem):
 
     def __init__(self, points: list, shape_label: str = "Hình",
-                 color=None, width=None, fill_color=None):
+                 color=None, width=None, fill_color=None,
+                 stretch_edges=()):
         super().__init__(color, width)
         self.points: list = list(points)
         self.shape_label = shape_label
+        # Cạnh k = (đỉnh k, đỉnh k+1) có thể kéo dãn theo pháp tuyến mà
+        # hình vẫn đúng loại (vd. hình chữ nhật: cả 4 cạnh)
+        self.stretch_edges = tuple(stretch_edges)
         self.fill_color: QColor = fill_color or QColor(200, 220, 255, 50)
         self._updating = False
         self._last: list = []
@@ -87,6 +91,40 @@ class ShapeItem(GeoItem):
         finally:
             self._updating = False
         self.sync()
+
+    def stretch_edge_at(self, pos: QPointF, tol: float):
+        """Cạnh kéo dãn được gần pos (không tính vùng sát đỉnh), hoặc None."""
+        n = len(self.points)
+        for k in self.stretch_edges:
+            a = self.points[k].scenePos()
+            b = self.points[(k + 1) % n].scenePos()
+            ab = b - a
+            L2 = ab.x() ** 2 + ab.y() ** 2
+            if L2 < 1e-9:
+                continue
+            t = ((pos - a).x() * ab.x() + (pos - a).y() * ab.y()) / L2
+            L = L2 ** 0.5
+            if t * L < tol * 1.5 or (1 - t) * L < tol * 1.5:
+                continue          # sát đỉnh → để kéo đỉnh
+            proj = a + ab * t
+            d = ((pos - proj).x() ** 2 + (pos - proj).y() ** 2) ** 0.5
+            if d <= tol:
+                return k
+        return None
+
+    def edge_normal(self, k: int) -> QPointF:
+        """Pháp tuyến đơn vị của cạnh k, hướng ra ngoài hình."""
+        n = len(self.points)
+        a = self.points[k].scenePos()
+        b = self.points[(k + 1) % n].scenePos()
+        ab = b - a
+        L = (ab.x() ** 2 + ab.y() ** 2) ** 0.5 or 1.0
+        nx, ny = -ab.y() / L, ab.x() / L
+        cx = sum(p.scenePos().x() for p in self.points) / n
+        cy = sum(p.scenePos().y() for p in self.points) / n
+        if (a.x() - cx) * nx + (a.y() - cy) * ny < 0:
+            nx, ny = -nx, -ny
+        return QPointF(nx, ny)
 
     # ── Thêm / xóa khỏi scene ─────────────────────────────────────────────
 

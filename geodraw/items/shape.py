@@ -2,8 +2,11 @@
 ShapeItem — hình mẫu (hình vuông, tam giác đều…) dựng từ các điểm đỉnh.
 
 • Mỗi đỉnh là một PointItem → kéo được, bắt dính được như điểm thường.
-• Kéo 1 đỉnh: cả hình co giãn + xoay quanh đỉnh đối diện (phép đồng dạng),
-  nên hình dạng luôn giữ nguyên (vuông vẫn vuông, đều vẫn đều…).
+• Kéo 1 đỉnh: tùy loại hình (xem _solve). Mặc định cả hình co giãn + xoay
+  quanh đỉnh đối diện (phép đồng dạng) nên hình dạng giữ nguyên; hình chữ
+  nhật, hình thoi, tam giác vuông/cân, hình bình hành, hình thang có quy tắc
+  riêng để đổi tỉ lệ mà vẫn đúng loại hình.
+• Kéo cạnh (SelectTool) → di chuyển cả hình.
 • Kéo thân hình (SelectTool) → di chuyển tất cả đỉnh cùng lúc.
 """
 from contextlib import contextmanager
@@ -26,11 +29,113 @@ def constraints_suspended():
         _suspend_depth -= 1
 
 
+def _dot(a: QPointF, b: QPointF) -> float:
+    return a.x() * b.x() + a.y() * b.y()
+
+
+def _cross(a: QPointF, b: QPointF) -> float:
+    return a.x() * b.y() - a.y() * b.x()
+
+
+def _unit(v: QPointF) -> QPointF:
+    L = (v.x() ** 2 + v.y() ** 2) ** 0.5
+    return QPointF(v.x() / L, v.y() / L) if L > 1e-9 else QPointF(1, 0)
+
+
+def _keep_sign(val: float, ref: float, min_abs: float = 4.0) -> float:
+    """Giữ cùng dấu với ref và |val| ≥ min_abs (không cho hình bị lật / dẹt)."""
+    sign = 1.0 if ref >= 0 else -1.0
+    return sign * max(min_abs, val * sign)
+
+
+def _solve(kind: str, i: int, L: list, m: QPointF):
+    """
+    Quy tắc kéo đỉnh i tới m cho từng loại hình (L = vị trí cũ các đỉnh).
+    Trả về vị trí mới của mọi đỉnh, hoặc None → dùng phép đồng dạng
+    (co giãn + xoay quanh đỉnh đối diện, giữ nguyên hình dạng).
+    """
+    n = len(L)
+    if kind == "rectangle":
+        # Đỉnh đối diện đứng yên, 2 trục giữ nguyên → đổi dài / rộng tự do
+        j = (i + 2) % 4
+        P = L[j]
+        u = _unit(L[1] - L[0])
+        v = _unit(L[3] - L[0])
+        a0, b0 = _dot(L[i] - P, u), _dot(L[i] - P, v)
+        a = _keep_sign(_dot(m - P, u), a0)
+        b = _keep_sign(_dot(m - P, v), b0)
+        out = list(L)
+        out[i] = P + u * a + v * b
+        for k in ((i + 1) % 4, (i + 3) % 4):
+            o = L[k] - P
+            out[k] = P + u * a if abs(_dot(o, u)) > abs(_dot(o, v)) else P + v * b
+        return out
+
+    if kind == "rhombus":
+        # Tâm + 2 trục giữ nguyên, cạnh giữ nguyên độ dài → co giãn đường chéo
+        j = (i + 2) % 4
+        c = (L[i] + L[j]) / 2
+        e = _unit(L[i] - c)
+        f = _unit(L[(i + 1) % 4] - c)
+        side = ((L[i] - L[(i + 1) % 4]).x() ** 2 +
+                (L[i] - L[(i + 1) % 4]).y() ** 2) ** 0.5
+        t = max(0.08 * side, min(0.92 * side, _dot(m - c, e)))
+        q = (side * side - t * t) ** 0.5
+        out = list(L)
+        out[i] = c + e * t
+        out[j] = c - e * t
+        out[(i + 1) % 4] = c + f * q
+        out[(i + 3) % 4] = c - f * q
+        return out
+
+    if kind == "right_triangle" and i in (1, 2):
+        # Góc vuông tại đỉnh 0: đỉnh 1/2 trượt trên cạnh góc vuông của nó
+        u = _unit(L[i] - L[0])
+        out = list(L)
+        out[i] = L[0] + u * max(4.0, _dot(m - L[0], u))
+        return out
+
+    if kind == "isosceles_triangle" and i == 0:
+        # Đỉnh cân trượt trên đường cao → đổi chiều cao, đáy giữ nguyên
+        mid = (L[1] + L[2]) / 2
+        e = _unit(L[0] - mid)
+        out = list(L)
+        out[0] = mid + e * max(4.0, _dot(m - mid, e))
+        return out
+
+    if kind == "parallelogram" and i in (2, 3):
+        # Đáy 0-1 giữ nguyên; cạnh bên đổi hướng / độ dài tự do
+        base = L[1] - L[0]
+        w = m - (L[1] if i == 2 else L[0])
+        if _cross(base, w) * _cross(base, L[3] - L[0]) <= 0 or \
+                abs(_cross(_unit(base), w)) < 4.0:
+            return list(L)            # không cho hình bị lật / dẹt
+        out = list(L)
+        out[2] = L[1] + w
+        out[3] = L[0] + w
+        return out
+
+    if kind == "trapezoid" and i in (2, 3):
+        # Đáy lớn giữ nguyên; đáy nhỏ tịnh tiến (đổi chiều cao / độ lệch)
+        base = L[1] - L[0]
+        d = m - L[i]
+        new_top = L[3] + d
+        if _cross(base, new_top - L[0]) * _cross(base, L[3] - L[0]) <= 0 or \
+                abs(_cross(_unit(base), new_top - L[0])) < 4.0:
+            return list(L)
+        out = list(L)
+        out[2] = L[2] + d
+        out[3] = L[3] + d
+        return out
+
+    return None
+
+
 class ShapeItem(GeoItem):
 
     def __init__(self, points: list, shape_label: str = "Hình",
                  color=None, width=None, fill_color=None,
-                 stretch_edges=(), edges=None):
+                 kind: str = "", edges=None):
         super().__init__(color, width)
         self.points: list = list(points)
         # Cạnh k = SegmentItem(đỉnh k, đỉnh k+1) — click 1 lần chọn cạnh,
@@ -40,9 +145,8 @@ class ShapeItem(GeoItem):
             seg._shape = self
             seg._shape_edge = k
         self.shape_label = shape_label
-        # Cạnh k = (đỉnh k, đỉnh k+1) có thể kéo dãn theo pháp tuyến mà
-        # hình vẫn đúng loại (vd. hình chữ nhật: cả 4 cạnh)
-        self.stretch_edges = tuple(stretch_edges)
+        # Loại hình (tên tool: rectangle, rhombus…) → quy tắc kéo đỉnh riêng
+        self.kind = kind
         self.fill_color: QColor = fill_color or QColor(200, 220, 255, 50)
         self._updating = False
         self._last: list = []
@@ -72,6 +176,17 @@ class ShapeItem(GeoItem):
             self.sync()
             return
         i = moved[0]
+        solved = _solve(self.kind, i, self._last, cur[i])
+        if solved is not None:
+            self._updating = True
+            try:
+                for k, p in enumerate(self.points):
+                    if (p.scenePos() - solved[k]).manhattanLength() > 1e-9:
+                        p.setPos(solved[k])
+            finally:
+                self._updating = False
+            self.sync()
+            return
         j = (i + n // 2) % n          # đỉnh đối diện làm tâm
         pivot = self._last[j]
         old_v = self._last[i] - pivot
@@ -97,40 +212,6 @@ class ShapeItem(GeoItem):
         finally:
             self._updating = False
         self.sync()
-
-    def stretch_edge_at(self, pos: QPointF, tol: float):
-        """Cạnh kéo dãn được gần pos (không tính vùng sát đỉnh), hoặc None."""
-        n = len(self.points)
-        for k in self.stretch_edges:
-            a = self.points[k].scenePos()
-            b = self.points[(k + 1) % n].scenePos()
-            ab = b - a
-            L2 = ab.x() ** 2 + ab.y() ** 2
-            if L2 < 1e-9:
-                continue
-            t = ((pos - a).x() * ab.x() + (pos - a).y() * ab.y()) / L2
-            L = L2 ** 0.5
-            if t * L < tol * 1.5 or (1 - t) * L < tol * 1.5:
-                continue          # sát đỉnh → để kéo đỉnh
-            proj = a + ab * t
-            d = ((pos - proj).x() ** 2 + (pos - proj).y() ** 2) ** 0.5
-            if d <= tol:
-                return k
-        return None
-
-    def edge_normal(self, k: int) -> QPointF:
-        """Pháp tuyến đơn vị của cạnh k, hướng ra ngoài hình."""
-        n = len(self.points)
-        a = self.points[k].scenePos()
-        b = self.points[(k + 1) % n].scenePos()
-        ab = b - a
-        L = (ab.x() ** 2 + ab.y() ** 2) ** 0.5 or 1.0
-        nx, ny = -ab.y() / L, ab.x() / L
-        cx = sum(p.scenePos().x() for p in self.points) / n
-        cy = sum(p.scenePos().y() for p in self.points) / n
-        if (a.x() - cx) * nx + (a.y() - cy) * ny < 0:
-            nx, ny = -nx, -ny
-        return QPointF(nx, ny)
 
     # ── Thêm / xóa khỏi scene ─────────────────────────────────────────────
 

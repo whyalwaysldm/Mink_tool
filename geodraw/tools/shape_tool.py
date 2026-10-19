@@ -17,8 +17,6 @@ def _dist(a: QPointF, b: QPointF) -> float:
 class PresetShapeTool(BaseTool):
     """Click + drag để đặt hình preset. Override compute_vertices()."""
     shape_label: str = "Hình"
-    # Cạnh kéo dãn được (đổi tỉ lệ) mà hình vẫn đúng loại
-    stretch_edges: tuple = ()
 
     def __init__(self, scene, history, tool_manager):
         super().__init__(scene, history, tool_manager)
@@ -82,7 +80,7 @@ class PresetShapeTool(BaseTool):
                 edges = [SegmentItem(vertices[k], vertices[(k + 1) % n])
                          for k in range(n)]
                 item = ShapeItem(vertices, self.shape_label,
-                                 stretch_edges=self.stretch_edges,
+                                 kind=self.name,
                                  edges=edges)
                 self.history.push_add_batch(
                     self.scene, vertices + [item] + edges)
@@ -102,8 +100,6 @@ class PresetShapeTool(BaseTool):
 class RectangleTool(PresetShapeTool):
     name = "rectangle"
     shape_label = "Hình chữ nhật"
-
-    stretch_edges = (0, 1, 2, 3)
 
     def compute_vertices(self, anchor, current):
         x0, y0 = anchor.x(), anchor.y()
@@ -145,8 +141,6 @@ class EquilateralTriangleTool(PresetShapeTool):
 class RightTriangleTool(PresetShapeTool):
     name = "right_triangle"
     shape_label = "Tam giác vuông"
-
-    stretch_edges = (0, 2)
 
     def compute_vertices(self, anchor, current):
         # góc vuông tại anchor, 2 cạnh góc vuông theo trục
@@ -195,8 +189,6 @@ class ParallelogramTool(PresetShapeTool):
     name = "parallelogram"
     shape_label = "Hình bình hành"
 
-    stretch_edges = (0, 1, 2, 3)
-
     def compute_vertices(self, anchor, current):
         dx = current.x() - anchor.x()
         dy = current.y() - anchor.y()
@@ -215,8 +207,6 @@ class IsoscelesTriangleTool(PresetShapeTool):
     name = "isosceles_triangle"
     shape_label = "Tam giác cân"
 
-    stretch_edges = (1,)
-
     def compute_vertices(self, anchor, current):
         # anchor = đỉnh, current = trung điểm đáy
         dx = current.x() - anchor.x()
@@ -234,8 +224,6 @@ class IsoscelesTriangleTool(PresetShapeTool):
 class TrapezoidTool(PresetShapeTool):
     name = "trapezoid"
     shape_label = "Hình thang"
-
-    stretch_edges = (0, 2)
 
     def compute_vertices(self, anchor, current):
         # đáy lớn = anchor → current (theo trục x)

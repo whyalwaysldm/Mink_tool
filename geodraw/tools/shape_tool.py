@@ -5,6 +5,7 @@ from PyQt6.QtGui import QPen, QBrush, QColor, QPolygonF
 from .base_tool import BaseTool
 from items.point import PointItem
 from items.shape import ShapeItem
+from items.segment import SegmentItem
 
 
 def _dist(a: QPointF, b: QPointF) -> float:
@@ -77,12 +78,17 @@ class PresetShapeTool(BaseTool):
             if pts and len(pts) >= 3:
                 # Dựng hình từ các điểm đỉnh — kéo đỉnh để đổi cỡ / xoay
                 vertices = [PointItem(p) for p in pts]
+                n = len(vertices)
+                edges = [SegmentItem(vertices[k], vertices[(k + 1) % n])
+                         for k in range(n)]
                 item = ShapeItem(vertices, self.shape_label,
-                                 stretch_edges=self.stretch_edges)
-                self.history.push_add_batch(self.scene, vertices + [item])
+                                 stretch_edges=self.stretch_edges,
+                                 edges=edges)
+                self.history.push_add_batch(
+                    self.scene, vertices + [item] + edges)
                 self.tm.status_hint.emit(
-                    f"✓ {self.shape_label} — kéo một đỉnh (công cụ Chọn) để "
-                    "đổi kích thước / xoay; kéo thân hình để di chuyển")
+                    f"✓ {self.shape_label} — công cụ Chọn: click cạnh để chọn cạnh, "
+                    "double-click để chọn cả hình; kéo đỉnh để đổi cỡ / xoay")
         self._pressing = False
         self._anchor = None
         self._remove_ghost()

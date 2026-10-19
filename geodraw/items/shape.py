@@ -30,9 +30,15 @@ class ShapeItem(GeoItem):
 
     def __init__(self, points: list, shape_label: str = "Hình",
                  color=None, width=None, fill_color=None,
-                 stretch_edges=()):
+                 stretch_edges=(), edges=None):
         super().__init__(color, width)
         self.points: list = list(points)
+        # Cạnh k = SegmentItem(đỉnh k, đỉnh k+1) — click 1 lần chọn cạnh,
+        # double-click mới chọn cả hình
+        self.edges: list = list(edges or [])
+        for k, seg in enumerate(self.edges):
+            seg._shape = self
+            seg._shape_edge = k
         self.shape_label = shape_label
         # Cạnh k = (đỉnh k, đỉnh k+1) có thể kéo dãn theo pháp tuyến mà
         # hình vẫn đúng loại (vd. hình chữ nhật: cả 4 cạnh)
@@ -163,10 +169,39 @@ class ShapeItem(GeoItem):
         poly = self._local_poly()
         if poly.count() < 2:
             return
-        color = QColor(0, 120, 215) if self.isSelected() else self.color
-        pen = QPen(color, self.stroke_width)
-        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
-        painter.setPen(pen)
+        if self.edges and not self.isSelected():
+            # Cạnh do các SegmentItem tự vẽ → ở đây chỉ tô nền
+            painter.setPen(Qt.PenStyle.NoPen)
+        else:
+            color = QColor(0, 120, 215) if self.isSelected() else self.color
+            pen = QPen(color, self.stroke_width)
+            pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
         painter.setBrush(QBrush(self.fill_color))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.drawPolygon(poly)
+
+
+def shape_of(item):
+    """ShapeItem chứa item (chính nó, hoặc cạnh của nó), hoặc None."""
+    if isinstance(item, ShapeItem):
+        return item
+    return getattr(item, "_shape", None)
+
+
+def expand_for_delete(items: list) -> list:
+    """Xóa cả hình mẫu → xóa luôn cạnh và đỉnh không còn dùng ở chỗ khác."""
+    result = list(items)
+    for it in items:
+        if not isinstance(it, ShapeItem):
+            continue
+        own = set(it.edges) | {it}
+        for seg in it.edges:
+            if seg not in result:
+                result.append(seg)
+        for p in it.points:
+            if p in result:
+                continue
+            if all(d in own for d in p._dependents):
+                result.append(p)
+    return result

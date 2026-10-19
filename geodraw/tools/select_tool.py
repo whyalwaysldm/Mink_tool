@@ -121,8 +121,12 @@ class SelectTool(BaseTool):
     # ── Chọn item (dùng chung cho press và double_click) ─────────────
 
     def _select_at(self, pos: QPointF, modifiers):
+        from items.shape import ShapeItem
         shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
-        items = self._geo_items_at(pos)
+        # Hình mẫu: click 1 lần chỉ chọn cạnh / đỉnh; cả hình → double-click
+        items = [it for it in self._geo_items_at(pos)
+                 if not (isinstance(it, ShapeItem) and it.edges
+                         and not it.isSelected())]
 
         if not items:
             self.scene.clearSelection()
@@ -167,12 +171,14 @@ class SelectTool(BaseTool):
             self._did_drag             = False
             self._drag_start_mouse     = pos
             # Hình mẫu (ShapeItem) di chuyển bằng cách kéo các đỉnh của nó
-            from items.shape import ShapeItem
+            from items.shape import shape_of
             drag_items = []
             for it in self.scene.selectedItems():
-                if isinstance(it, ShapeItem):
-                    drag_items.extend(it.points)
-                else:
+                shp = shape_of(it)
+                if shp is not None:
+                    drag_items.extend(p for p in shp.points
+                                      if p not in drag_items)
+                elif it not in drag_items:
                     drag_items.append(it)
             self._drag_start_positions = {
                 it: QPointF(it.pos()) for it in drag_items
@@ -190,6 +196,18 @@ class SelectTool(BaseTool):
                 from ui.label_dialog import edit_label
                 edit_label(it, self.scene, self.history)
                 return
+        from items.shape import shape_of
+        for it in self._geo_items_at(pos):
+            shp = shape_of(it)
+            if shp is not None:
+                # Double-click vào hình mẫu (cạnh hoặc bên trong) → chọn cả hình
+                self._reset()
+                self.scene.clearSelection()
+                shp.setSelected(True)
+                self.tm.status_hint.emit(
+                    f"Đã chọn cả {shp.shape_label} — kéo để di chuyển, "
+                    "Delete để xóa")
+                return
         self._select_at(pos, Qt.KeyboardModifier.NoModifier)
 
     # ── Kéo cạnh hình mẫu → kéo dãn (đổi tỉ lệ) ─────────────────────
@@ -204,7 +222,9 @@ class SelectTool(BaseTool):
         if any(isinstance(it, PointItem) for it in self._geo_items_at(pos)):
             return False
         for it in self.scene.items():
-            if not (isinstance(it, ShapeItem) and it.stretch_edges):
+            # Đang chọn cả hình → kéo cạnh là di chuyển hình, không kéo dãn
+            if not (isinstance(it, ShapeItem) and it.stretch_edges
+                    and not it.isSelected()):
                 continue
             k = it.stretch_edge_at(pos, tol)
             if k is None:
@@ -212,7 +232,10 @@ class SelectTool(BaseTool):
             n = len(it.points)
             pts = (it.points[k], it.points[(k + 1) % n])
             self.scene.clearSelection()
-            it.setSelected(True)
+            if it.edges:
+                it.edges[k].setSelected(True)     # chỉ chọn cạnh đang bấm
+            else:
+                it.setSelected(True)
             self._stretch = (it, k, it.edge_normal(k),
                              {p: QPointF(p.pos()) for p in pts})
             self._drag_start_mouse = QPointF(pos)
@@ -280,7 +303,8 @@ class SelectTool(BaseTool):
 
     def key_press(self, key, modifiers):
         if key in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
-            selected = self.scene.selectedItems()
+            from items.shape import expand_for_delete
+            selected = expand_for_delete(self.scene.selectedItems())
             if selected:
                 self.history.push_remove(self.scene, selected)
                 self._reset_cycle()

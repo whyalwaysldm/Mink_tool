@@ -404,7 +404,8 @@ class MainWindow(QMainWindow):
         elif action == "save_pdf":
             self._save_pdf()
         elif action == "delete_selected":
-            selected = self._scene.selectedItems()
+            from items.shape import expand_for_delete
+            selected = expand_for_delete(self._scene.selectedItems())
             if selected:
                 self._history.push_remove(self._scene, selected)
         elif action == "zoom_in":

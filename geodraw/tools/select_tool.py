@@ -192,7 +192,13 @@ class SelectTool(BaseTool):
                 edit_label(it, self.scene, self.history)
                 return
         from items.shape import shape_of
-        for it in self._geo_items_at(pos):
+        from items.point import PointItem
+        hits = self._geo_items_at(pos)
+        if any(isinstance(it, PointItem) for it in hits):
+            # Double-click trúng đỉnh → vẫn là chọn / kéo điểm, không chọn cả hình
+            self._select_at(pos, Qt.KeyboardModifier.NoModifier)
+            return
+        for it in hits:
             shp = shape_of(it)
             if shp is not None:
                 # Double-click vào hình mẫu (cạnh hoặc bên trong) → chọn cả hình

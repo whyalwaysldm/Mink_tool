@@ -72,20 +72,15 @@ def _solve(kind: str, i: int, L: list, m: QPointF):
         return out
 
     if kind == "rhombus":
-        # Tâm + 2 trục giữ nguyên, cạnh giữ nguyên độ dài → co giãn đường chéo
+        # Tâm + 2 trục giữ nguyên; 2 đỉnh kề đứng yên → chỉ co giãn đường chéo
+        # đi qua đỉnh đang kéo (đối xứng qua tâm), không giới hạn độ dài
         j = (i + 2) % 4
         c = (L[i] + L[j]) / 2
         e = _unit(L[i] - c)
-        f = _unit(L[(i + 1) % 4] - c)
-        side = ((L[i] - L[(i + 1) % 4]).x() ** 2 +
-                (L[i] - L[(i + 1) % 4]).y() ** 2) ** 0.5
-        t = max(0.08 * side, min(0.92 * side, _dot(m - c, e)))
-        q = (side * side - t * t) ** 0.5
+        t = max(4.0, _dot(m - c, e))
         out = list(L)
         out[i] = c + e * t
         out[j] = c - e * t
-        out[(i + 1) % 4] = c + f * q
-        out[(i + 3) % 4] = c - f * q
         return out
 
     if kind == "right_triangle" and i in (1, 2):

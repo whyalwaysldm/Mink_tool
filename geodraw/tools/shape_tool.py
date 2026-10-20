@@ -192,10 +192,12 @@ class ParallelogramTool(PresetShapeTool):
     def compute_vertices(self, anchor, current):
         dx = current.x() - anchor.x()
         dy = current.y() - anchor.y()
-        # cạnh đáy = anchor→current, chiều cao = 0.55 * cạnh đáy
+        # cạnh đáy = anchor→current, chiều cao = 0.55 * cạnh đáy,
+        # cạnh bên nghiêng thêm 0.35 * cạnh đáy (nếu không sẽ thành hình chữ nhật)
         h = 0.55
-        ox = -dy * h
-        oy =  dx * h
+        s = 0.35
+        ox = -dy * h + dx * s
+        oy =  dx * h + dy * s
         p0 = anchor
         p1 = current
         p2 = QPointF(current.x() + ox, current.y() + oy)

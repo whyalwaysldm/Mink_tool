@@ -120,14 +120,19 @@ class SelectTool(BaseTool):
 
     def _select_at(self, pos: QPointF, modifiers):
         from items.shape import ShapeItem
-        shift = bool(modifiers & Qt.KeyboardModifier.ShiftModifier)
+        # Ctrl (hoặc Shift) + click → thêm / bớt vào vùng chọn (chọn nhiều)
+        from PyQt6.QtWidgets import QApplication
+        mods = modifiers | QApplication.keyboardModifiers()   # bút không gửi kèm phím
+        shift = bool(mods & (Qt.KeyboardModifier.ShiftModifier |
+                             Qt.KeyboardModifier.ControlModifier))
         # Hình mẫu: click 1 lần chỉ chọn cạnh / đỉnh; cả hình → double-click
         items = [it for it in self._geo_items_at(pos)
                  if not (isinstance(it, ShapeItem) and it.edges
                          and not it.isSelected())]
 
         if not items:
-            self.scene.clearSelection()
+            if not shift:   # Ctrl+click chỗ trống → giữ nguyên vùng chọn
+                self.scene.clearSelection()
             self._reset_cycle()
             return False   # không có item
 
@@ -294,7 +299,7 @@ class SelectTool(BaseTool):
             return
         if n == 1:
             self.tm.status_hint.emit(
-                f"Đã chọn 1 đoạn — Shift+click thêm đoạn khác; D để đo độ dài")
+                f"Đã chọn 1 đoạn — Ctrl+click thêm đoạn khác; D để đo độ dài")
         elif n == 2:
             # Kiểm tra xem 2 đoạn có chung đỉnh không
             from tools.measure_tool import _shared_vertex, _are_collinear
@@ -303,13 +308,13 @@ class SelectTool(BaseTool):
                 from tools.measure_tool import _angle_at
                 ang = _angle_at(*rv)
                 self.tm.status_hint.emit(
-                    f"Góc ≈ {ang:.1f}° — D: đo góc   |   J: vẽ phân giác   |   Shift+click: thêm đoạn")
+                    f"Góc ≈ {ang:.1f}° — D: đo góc   |   J: vẽ phân giác   |   Ctrl+click: thêm đoạn")
             else:
                 self.tm.status_hint.emit(
-                    f"2 đoạn — D: đo độ dài cả 2   |   Shift+click: thêm đoạn")
+                    f"2 đoạn — D: đo độ dài cả 2   |   Ctrl+click: thêm đoạn")
         else:
             self.tm.status_hint.emit(
-                f"{n} đoạn được chọn — D: đo độ dài   |   Shift+click: thêm/bớt")
+                f"{n} đoạn được chọn — D: đo độ dài   |   Ctrl+click: thêm/bớt")
 
 
 # ── Helper: tên gợi nhớ của item ─────────────────────────────────────────────

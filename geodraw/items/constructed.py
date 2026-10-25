@@ -4,8 +4,9 @@
 • FootPointItem      — chân đường vuông góc hạ từ A xuống đường (hiện ra).
 • DirectionPointItem — điểm ẩn A + hướng (song song / vuông góc với đường),
   dùng làm điểm thứ hai cho LineItem đi qua A.
+• RadiusPointItem    — điểm ẩn cách A bằng độ dài đoạn, làm bán kính đường tròn.
 
-Cả hai tự cập nhật khi A hoặc đường di chuyển, và không kéo trực tiếp được.
+Các điểm này tự cập nhật khi A hoặc đường di chuyển, và không kéo trực tiếp được.
 """
 import math
 from PyQt6.QtWidgets import QGraphicsItem
@@ -81,3 +82,18 @@ class DirectionPointItem(_ConstrainedPoint):
             ux, uy = -uy, ux
         a = self._a.scenePos()
         return QPointF(a.x() + ux * DIRECTION_LEN, a.y() + uy * DIRECTION_LEN)
+
+
+class RadiusPointItem(_ConstrainedPoint):
+    """Điểm ẩn cách tâm A đúng bằng độ dài đoạn (l1, l2) — bán kính cho CircleItem."""
+
+    def __init__(self, a, l1, l2, color=None):
+        super().__init__(a, l1, l2, color)
+        self.setVisible(False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+
+    def _compute_pos(self) -> QPointF:
+        p, q = self._l1.scenePos(), self._l2.scenePos()
+        r = math.hypot(q.x() - p.x(), q.y() - p.y())
+        a = self._a.scenePos()
+        return QPointF(a.x() + r, a.y())

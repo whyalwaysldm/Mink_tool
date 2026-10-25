@@ -4,7 +4,9 @@ from .base_tool import BaseTool
 from items.point import PointItem
 from items.segment import SegmentItem
 from items.line import LineItem, RayItem
-from items.constructed import FootPointItem, DirectionPointItem
+from items.circle import CircleItem
+from items.constructed import (FootPointItem, DirectionPointItem,
+                                RadiusPointItem)
 
 _LINE_TYPES = (SegmentItem, LineItem, RayItem)
 
@@ -23,6 +25,8 @@ class _ThroughPointTool(BaseTool):
     """
     perpendicular = False
     title = ""
+    line_types = _LINE_TYPES
+    line_word = "đường"            # tên đối tượng thứ hai trong thông báo
 
     def __init__(self, scene, history, tool_manager):
         super().__init__(scene, history, tool_manager)
@@ -51,7 +55,7 @@ class _ThroughPointTool(BaseTool):
         """Điểm + đường đã chọn sẵn (công cụ Chọn) → vẽ cho mọi cặp."""
         sel = self.scene.selectedItems()
         pts = [it for it in sel if isinstance(it, PointItem)]
-        lines = [it for it in sel if isinstance(it, _LINE_TYPES)]
+        lines = [it for it in sel if isinstance(it, self.line_types)]
         if not pts or not lines:
             return False
         n = self._create(pts, lines, new_points=[])
@@ -66,7 +70,7 @@ class _ThroughPointTool(BaseTool):
         """Đoạn / đường thẳng / tia gần pos."""
         r = 6.0
         for item in self.scene.items(QRectF(pos.x() - r, pos.y() - r, 2 * r, 2 * r)):
-            if isinstance(item, _LINE_TYPES) and item.isVisible():
+            if isinstance(item, self.line_types) and item.isVisible():
                 return item
         return None
 
@@ -76,14 +80,10 @@ class _ThroughPointTool(BaseTool):
         count = 0
         for a in pts:
             for line in lines:
-                if a is line.p1 or a is line.p2:
-                    if not self.perpendicular:
-                        continue      # song song qua điểm nằm trên đường = chính nó
-                helper = DirectionPointItem(a, line.p1, line.p2, self.perpendicular)
-                items += [helper, LineItem(a, helper)]
-                if self.perpendicular:
-                    items.append(FootPointItem(a, line.p1, line.p2))
-                count += 1
+                made = self._make(a, line)
+                if made:
+                    items += made
+                    count += 1
         if not count:
             return 0
         for it in items:
@@ -91,6 +91,16 @@ class _ThroughPointTool(BaseTool):
                 self.scene.addItem(it)
         self.history.push_add_batch(self.scene, items)
         return count
+
+    def _make(self, a: PointItem, line) -> list:
+        """Đối tượng mới cho cặp (điểm a, đường line); [] nếu bỏ qua."""
+        if not self.perpendicular and (a is line.p1 or a is line.p2):
+            return []                 # song song qua điểm nằm trên đường = chính nó
+        helper = DirectionPointItem(a, line.p1, line.p2, self.perpendicular)
+        items = [helper, LineItem(a, helper)]
+        if self.perpendicular:
+            items.append(FootPointItem(a, line.p1, line.p2))
+        return items
 
     # ── Events ────────────────────────────────────────────────────────
 
@@ -116,7 +126,7 @@ class _ThroughPointTool(BaseTool):
             if ctrl and len(self._pts) == 1:
                 # Giữ Ctrl: giữ điểm để click tiếp đường khác
                 self.tm.status_hint.emit(
-                    f"✓ Đã vẽ {self.title.lower()} — Ctrl + click đường khác, "
+                    f"✓ Đã vẽ {self.title.lower()} — Ctrl + click {self.line_word} khác, "
                     "hoặc click điểm mới")
                 return
             for p in self._pts:
@@ -152,7 +162,7 @@ class _ThroughPointTool(BaseTool):
             pt.setSelected(True)
         k = len(self._pts)
         self.tm.status_hint.emit(
-            f"{self.title}: đã chọn {k} điểm — click vào đường "
+            f"{self.title}: đã chọn {k} điểm — click vào {self.line_word} "
             "(Ctrl + click để chọn thêm điểm / vẽ tới nhiều đường)")
 
     def key_press(self, key, modifiers):
@@ -171,3 +181,17 @@ class PerpendicularTool(_ThroughPointTool):
     name = "perpendicular"
     perpendicular = True
     title = "Đường vuông góc"
+
+
+class CompassTool(_ThroughPointTool):
+    """Đường tròn tâm là điểm, bán kính bằng độ dài đoạn thẳng.
+       Nhiều tâm + 1 đoạn → các đường tròn cùng bán kính;
+       1 tâm + nhiều đoạn → các đường tròn đồng tâm."""
+    name = "compass"
+    title = "Đường tròn (bán kính = đoạn)"
+    line_types = (SegmentItem,)
+    line_word = "đoạn thẳng"
+
+    def _make(self, a: PointItem, seg) -> list:
+        r = RadiusPointItem(a, seg.p1, seg.p2)
+        return [r, CircleItem(a, r)]

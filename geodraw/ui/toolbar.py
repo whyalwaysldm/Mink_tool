@@ -49,6 +49,7 @@ TOOLBAR_LAYOUT = [
         ("circle",         "○",  "Đường tròn (C)"),
         ("arc",            "⌒",  "Cung (A)"),
         ("circumcircle",   "⊙",  "Đường tròn ngoại tiếp 3 điểm (K)"),
+        ("compass",        "◎",  "Đường tròn tâm + bán kính bằng đoạn thẳng (O)"),
     ])),
     ("group", ("Tam giác / đa giác", [
         ("triangle",       "△",  "Tam giác (T)"),

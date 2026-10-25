@@ -319,6 +319,7 @@ class MainWindow(QMainWindow):
             # Geometry tools
             "midpoint": "M̈ Trung điểm", "angle_bisector": "∠ Phân giác",
             "parallel": "∥ Đường song song", "perpendicular": "⊥ Đường vuông góc",
+            "compass": "◎ Đường tròn bán kính = đoạn",
             "circumcircle": "⊙ Ngoại tiếp", "rename_point": "Aa Đặt tên điểm",
             "measure": "📐 Đo đạc",
             # Shape tools

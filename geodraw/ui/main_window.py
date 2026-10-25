@@ -318,6 +318,7 @@ class MainWindow(QMainWindow):
             "ink": "✏ Bút vẽ", "erase": "⌫ Xóa",
             # Geometry tools
             "midpoint": "M̈ Trung điểm", "angle_bisector": "∠ Phân giác",
+            "parallel": "∥ Đường song song", "perpendicular": "⊥ Đường vuông góc",
             "circumcircle": "⊙ Ngoại tiếp", "rename_point": "Aa Đặt tên điểm",
             "measure": "📐 Đo đạc",
             # Shape tools

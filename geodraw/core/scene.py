@@ -152,7 +152,8 @@ class GeoScene(QGraphicsScene):
         self._tool = tool
 
     def point_items(self) -> list:
-        return [it for it in self.items() if isinstance(it, PointItem)]
+        return [it for it in self.items()
+                if isinstance(it, PointItem) and it.isVisible()]
 
     def snap(self, pos, exclude=None):
         """Backward-compat: trả về (item_or_None, snapped_pos)."""

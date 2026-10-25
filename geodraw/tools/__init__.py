@@ -19,6 +19,7 @@ from .angle_bisector_tool import AngleBisectorTool
 from .circumcircle_tool import CircumcircleTool
 from .rename_point_tool import RenamePointTool
 from .measure_tool import MeasureTool
+from .parallel_tool import ParallelTool, PerpendicularTool
 
 _DEFAULT_SHORTCUTS = {
     "Escape": "select", "S": "segment", "L": "line", "R": "ray",
@@ -28,6 +29,7 @@ _DEFAULT_SHORTCUTS = {
     "V": "midpoint", "J": "angle_bisector",
     "K": "circumcircle", "N": "rename_point",
     "D": "measure",
+    "Q": "parallel", "W": "perpendicular",
     # Hình preset
     "F1": "rectangle", "F2": "square",
     "F3": "equilateral_triangle", "F4": "right_triangle",
@@ -69,7 +71,8 @@ class ToolManager(QObject):
 
         # Geometry construction tools
         for cls in (MidpointTool, AngleBisectorTool, CircumcircleTool,
-                    RenamePointTool, MeasureTool):
+                    RenamePointTool, MeasureTool,
+                    ParallelTool, PerpendicularTool):
             self._tools[cls.name] = mk(cls)
         self._current_name = "select"
         self._current_tool = self._tools["select"]

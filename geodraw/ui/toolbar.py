@@ -18,8 +18,6 @@ MARK_SUBMODES = [
 SHAPE_TOOLS = [
     ("rectangle",               "▭",  "Hình chữ nhật (F1)"),
     ("square",                  "□",  "Hình vuông (F2)"),
-    ("right_triangle",          "◺",  "Tam giác vuông (F4)"),
-    ("isosceles_right_triangle","◿",  "Tam giác vuông cân (F5)"),
     ("rhombus",                 "◇",  "Hình thoi (F7)"),
     ("parallelogram",           "▱",  "Hình bình hành (F8)"),
     ("trapezoid",               "⏢",  "Hình thang (F9)"),
@@ -44,6 +42,8 @@ TOOLBAR_LAYOUT = [
         ("ray",            "→",  "Tia (R)"),
         None,
         ("angle_bisector", "∠",  "Phân giác góc (J)"),
+        ("parallel",       "∥",  "Đường song song qua 1 điểm (Q)"),
+        ("perpendicular",  "⊥",  "Đường vuông góc qua 1 điểm (W)"),
     ])),
     ("group", ("Đường tròn", [
         ("circle",         "○",  "Đường tròn (C)"),
@@ -54,6 +54,8 @@ TOOLBAR_LAYOUT = [
         ("triangle",       "△",  "Tam giác (T)"),
         ("equilateral_triangle", "▲", "Tam giác đều (F3)"),
         ("isosceles_triangle",   "🔺", "Tam giác cân (F6)"),
+        ("right_triangle",       "◺", "Tam giác vuông (F4)"),
+        ("isosceles_right_triangle", "◿", "Tam giác vuông cân (F5)"),
         None,
         ("polygon",        "⬡",  "Đa giác (G)"),
     ])),

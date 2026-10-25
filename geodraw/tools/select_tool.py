@@ -1,6 +1,7 @@
-from PyQt6.QtCore import Qt, QPointF
+from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtWidgets import QGraphicsItem
-from PyQt6.QtGui import QTransform
+from PyQt6.QtGui import QTransform, QPen, QBrush, QColor
+from PyQt6.QtWidgets import QGraphicsRectItem
 from .base_tool import BaseTool
 
 # px manhattan — vùng "cùng vị trí" để nhận ra click lặp lại
@@ -19,6 +20,9 @@ class SelectTool(BaseTool):
         self._drag_start_mouse: QPointF = None
         self._drag_start_positions: dict = {}
         self._did_drag             = False   # True khi đã vượt ngưỡng drag
+        self._band_start: QPointF  = None    # quét chọn: góc bắt đầu
+        self._band_item            = None    # khung quét đang vẽ
+        self._band_add             = False   # Ctrl/Shift → thêm vào vùng chọn
 
         # ── Trạng thái cycle ──────────────────────────────────────────
         self._cycle_pos:  QPointF = None   # vị trí click lần trước
@@ -36,6 +40,10 @@ class SelectTool(BaseTool):
         self._reset()
 
     def _reset(self):
+        self._band_start = None
+        if self._band_item is not None and self._band_item.scene():
+            self.scene.removeItem(self._band_item)
+        self._band_item = None
         self._dragging             = False
         self._did_drag             = False
         self._drag_start_mouse     = None
@@ -170,21 +178,116 @@ class SelectTool(BaseTool):
             self._dragging             = True
             self._did_drag             = False
             self._drag_start_mouse     = pos
-            # Hình mẫu (ShapeItem) di chuyển bằng cách kéo các đỉnh của nó
-            from items.shape import shape_of
-            drag_items = []
-            for it in self.scene.selectedItems():
-                shp = shape_of(it)
-                if shp is not None:
-                    drag_items.extend(p for p in shp.points
-                                      if p not in drag_items)
-                elif it not in drag_items:
-                    drag_items.append(it)
+            drag_items = self._drag_set(self.scene.selectedItems())
             self._drag_start_positions = {
                 it: QPointF(it.pos()) for it in drag_items
             }
         else:
+            # Click chỗ trống → bắt đầu quét chọn (kéo khung)
             self._reset()
+            from PyQt6.QtWidgets import QApplication
+            mods = modifiers | QApplication.keyboardModifiers()
+            self._band_add = bool(mods & (Qt.KeyboardModifier.ShiftModifier |
+                                          Qt.KeyboardModifier.ControlModifier))
+            self._band_start = QPointF(pos)
+
+    # ── Kéo cả vùng chọn: di chuyển cứng (giữ nguyên hình dạng) ──────
+
+    def _drag_set(self, selected: list) -> list:
+        """
+        Các item cần setPos khi kéo vùng chọn:
+          • điểm tự do của mọi đối tượng được chọn (đoạn, đường, đường tròn,
+            đa giác…) → cả cụm tịnh tiến, hình dạng giữ nguyên;
+          • cạnh / hình mẫu → mọi đỉnh của hình mẫu;
+          • nhãn, nét bút… (không phụ thuộc điểm) → chính nó.
+        """
+        from items.shape import shape_of
+        from items.point import PointItem
+        from items.point_label import PointLabelItem
+        from items.marks import (AngleMarkItem, RightAngleMarkItem,
+                                 EqualMarkItem, ParallelMarkItem)
+        from items.measure import SegmentMeasureItem, AngleMeasureItem
+        _FOLLOWERS = (AngleMarkItem, RightAngleMarkItem, EqualMarkItem,
+                      ParallelMarkItem, SegmentMeasureItem, AngleMeasureItem)
+        sel = set(selected)
+        # điểm → các item phụ thuộc nó (tra ngược)
+        deps_of: dict = {}
+        for p in self.scene.items():
+            if isinstance(p, PointItem):
+                for d in p._dependents:
+                    deps_of.setdefault(d, []).append(p)
+        out: list = []
+
+        def add(it):
+            if it not in out:
+                out.append(it)
+
+        for it in selected:
+            shp = shape_of(it)
+            if shp is not None:
+                for p in shp.points:
+                    add(p)
+            elif isinstance(it, PointItem):
+                add(it)
+            elif isinstance(it, PointLabelItem):
+                if it._point not in sel:     # điểm cũng được kéo → nhãn tự theo
+                    add(it)
+            elif isinstance(it, _FOLLOWERS):
+                continue                     # ký hiệu / số đo tự đi theo hình
+            elif it not in deps_of:
+                add(it)                      # nhãn tự do, nét bút…
+            else:
+                for p in deps_of[it]:
+                    add(p)
+        return out
+
+    # ── Quét chọn ─────────────────────────────────────────────────────
+
+    def _update_band(self, pos: QPointF):
+        rect = QRectF(self._band_start, pos).normalized()
+        if self._band_item is None:
+            self._band_item = QGraphicsRectItem()
+            pen = QPen(QColor(0, 120, 215), 1, Qt.PenStyle.DashLine)
+            pen.setCosmetic(True)
+            self._band_item.setPen(pen)
+            self._band_item.setBrush(QBrush(QColor(0, 120, 215, 30)))
+            self._band_item.setZValue(100)
+            self.scene.addItem(self._band_item)
+        self._band_item.setRect(rect)
+
+    def _finish_band(self, pos: QPointF):
+        """Chọn mọi đối tượng nằm trọn trong khung quét."""
+        from items.base import GeoItem
+        from items.point import PointItem
+        rect = QRectF(self._band_start, pos).normalized()
+        deps_of: dict = {}
+        for p in self.scene.items():
+            if isinstance(p, PointItem):
+                for d in p._dependents:
+                    deps_of.setdefault(d, []).append(p)
+        picked = []
+        for it in self.scene.items(rect):
+            if not isinstance(it, GeoItem) or not it.isVisible() or \
+                    not (it.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable):
+                continue
+            if isinstance(it, PointItem):
+                inside = rect.contains(it.scenePos())
+            elif it in deps_of:
+                # đối tượng dựng từ điểm: mọi điểm (hiện) của nó nằm trong khung
+                pts = [p for p in deps_of[it] if p.isVisible()] or deps_of[it]
+                inside = all(rect.contains(p.scenePos()) for p in pts)
+            else:
+                inside = rect.contains(it.sceneBoundingRect())
+            if inside:
+                picked.append(it)
+        if not self._band_add:
+            self.scene.clearSelection()
+        for it in picked:
+            it.setSelected(True)
+        if picked:
+            self.tm.status_hint.emit(
+                f"Đã chọn {len(self.scene.selectedItems())} đối tượng — "
+                "kéo để di chuyển cả cụm (giữ nguyên hình dạng), Delete để xóa")
 
     def double_click(self, pos: QPointF):
         """Double-click vào nhãn → sửa font / cỡ chữ; còn lại cycle như single-click."""
@@ -217,6 +320,11 @@ class SelectTool(BaseTool):
         self._select_at(pos, Qt.KeyboardModifier.NoModifier)
 
     def move(self, pos: QPointF, modifiers):
+        if self._band_start is not None:
+            if (pos - self._band_start).manhattanLength() >= _DRAG_THRESHOLD \
+                    or self._band_item is not None:
+                self._update_band(pos)
+            return
         if not self._dragging or self._drag_start_mouse is None:
             return
         delta = pos - self._drag_start_mouse
@@ -235,6 +343,11 @@ class SelectTool(BaseTool):
                 item.setPos(start_pos + delta)
 
     def release(self, pos: QPointF, button):
+        if self._band_start is not None:
+            if self._band_item is not None:
+                self._finish_band(pos)
+            self._reset()
+            return
         if self._dragging and self._did_drag:
             # Drag thật → lưu lịch sử di chuyển và reset cycle
             self.history.push_move_group(

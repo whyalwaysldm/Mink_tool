@@ -98,6 +98,15 @@ def _solve(kind: str, i: int, L: list, m: QPointF):
         out[0] = mid + e * max(4.0, _dot(m - mid, e))
         return out
 
+    if kind == "isosceles_triangle" and i in (1, 2):
+        # Đỉnh đáy kéo tự do; đỉnh đáy kia giữ hướng, độ dài cạnh bên bằng nhau
+        o = 3 - i
+        r = max(4.0, ((m - L[0]).x() ** 2 + (m - L[0]).y() ** 2) ** 0.5)
+        out = list(L)
+        out[i] = L[0] + _unit(m - L[0]) * r
+        out[o] = L[0] + _unit(L[o] - L[0]) * r
+        return out
+
     if kind == "parallelogram" and i in (2, 3):
         # Đáy 0-1 giữ nguyên; cạnh bên đổi hướng / độ dài tự do
         base = L[1] - L[0]

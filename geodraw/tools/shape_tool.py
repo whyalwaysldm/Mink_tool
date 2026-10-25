@@ -206,21 +206,74 @@ class ParallelogramTool(PresetShapeTool):
 
 
 class IsoscelesTriangleTool(PresetShapeTool):
+    """
+    Tam giác cân vẽ bằng 3 click:
+      1. đỉnh (đỉnh cân)   2. đỉnh đáy thứ nhất
+      3. đỉnh đáy thứ hai — tự đặt sao cho 2 cạnh bên bằng nhau,
+         hướng theo con trỏ (góc ở đỉnh lớn / nhỏ tùy chỗ click).
+    """
     name = "isosceles_triangle"
     shape_label = "Tam giác cân"
 
-    def compute_vertices(self, anchor, current):
-        # anchor = đỉnh, current = trung điểm đáy
-        dx = current.x() - anchor.x()
-        dy = current.y() - anchor.y()
-        base_half = math.sqrt(dx*dx + dy*dy) * 0.5
-        # đáy vuông góc với đường cao
-        nx = -dy / (math.sqrt(dx*dx+dy*dy) or 1)
-        ny =  dx / (math.sqrt(dx*dx+dy*dy) or 1)
-        base_cx, base_cy = current.x(), current.y()
-        p1 = QPointF(base_cx + nx * base_half, base_cy + ny * base_half)
-        p2 = QPointF(base_cx - nx * base_half, base_cy - ny * base_half)
-        return [anchor, p1, p2]
+    def activate(self):
+        super().activate()
+        self._clicks: list = []
+        self.tm.status_hint.emit("Tam giác cân: click đỉnh (đỉnh cân)")
+
+    def deactivate(self):
+        super().deactivate()
+        self._clicks = []
+
+    def _third(self, m: QPointF) -> QPointF:
+        """Đỉnh đáy thứ hai: cách đỉnh cân bằng cạnh bên, theo hướng con trỏ."""
+        a, b = self._clicks
+        r = _dist(a, b)
+        d = _dist(a, m) or 1.0
+        return QPointF(a.x() + (m.x() - a.x()) * r / d,
+                       a.y() + (m.y() - a.y()) * r / d)
+
+    def press(self, pos: QPointF, button, modifiers):
+        if button != Qt.MouseButton.LeftButton:
+            self.deactivate(); self.activate(); return
+        _, pos = self.scene.snap(pos)
+        clicks = getattr(self, "_clicks", [])
+        self._clicks = clicks
+        if len(clicks) == 1 and _dist(clicks[0], pos) < 5:
+            return
+        if len(clicks) < 2:
+            clicks.append(QPointF(pos))
+            self.tm.status_hint.emit(
+                "Tam giác cân: click đỉnh đáy thứ nhất" if len(clicks) == 1 else
+                "Tam giác cân: click đỉnh đáy thứ hai (di chuột để chỉnh góc ở đỉnh)")
+            return
+        c = self._third(pos)
+        if _dist(c, clicks[1]) < 3:
+            return
+        self._build([clicks[0], clicks[1], c])
+        self._clicks = []
+        self._remove_ghost()
+
+    def _build(self, pts: list):
+        vertices = [PointItem(p) for p in pts]
+        edges = [SegmentItem(vertices[k], vertices[(k + 1) % 3]) for k in range(3)]
+        item = ShapeItem(vertices, self.shape_label, kind=self.name, edges=edges)
+        self.history.push_add_batch(self.scene, vertices + [item] + edges)
+        self.tm.status_hint.emit(
+            "✓ Tam giác cân — kéo đỉnh đáy để đổi góc; "
+            "chuột phải vào tam giác (công cụ Chọn) để nhập số đo góc")
+
+    def move(self, pos: QPointF, modifiers):
+        clicks = getattr(self, "_clicks", [])
+        if not clicks:
+            return
+        _, pos = self.scene.snap(pos)
+        if len(clicks) == 1:
+            self._update_ghost([clicks[0], pos])
+        else:
+            self._update_ghost([clicks[0], clicks[1], self._third(pos)])
+
+    def release(self, pos: QPointF, button):
+        pass
 
 
 class TrapezoidTool(PresetShapeTool):

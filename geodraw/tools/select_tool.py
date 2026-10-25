@@ -168,6 +168,9 @@ class SelectTool(BaseTool):
     # ── Events ────────────────────────────────────────────────────────
 
     def press(self, pos: QPointF, button, modifiers):
+        if button == Qt.MouseButton.RightButton:
+            self._context_menu(pos)
+            return
         if button != Qt.MouseButton.LeftButton:
             return
 
@@ -190,6 +193,21 @@ class SelectTool(BaseTool):
             self._band_add = bool(mods & (Qt.KeyboardModifier.ShiftModifier |
                                           Qt.KeyboardModifier.ControlModifier))
             self._band_start = QPointF(pos)
+
+    # ── Chuột phải: menu (nhập số đo góc tam giác) ───────────────────
+
+    def _context_menu(self, pos: QPointF):
+        from tools.triangle_angles import triangle_at, edit_triangle_angles
+        tri = triangle_at(self.scene, self._geo_items_at(pos))
+        if tri is None:
+            return
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QCursor
+        view = self.scene.views()[0] if self.scene.views() else None
+        menu = QMenu(view)
+        act = menu.addAction("Nhập số đo góc…")
+        if menu.exec(QCursor.pos()) is act:
+            edit_triangle_angles(tri, self.scene, self.history)
 
     # ── Kéo cả vùng chọn: di chuyển cứng (giữ nguyên hình dạng) ──────
 

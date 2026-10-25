@@ -320,6 +320,8 @@ class MainWindow(QMainWindow):
             "midpoint": "M̈ Trung điểm", "angle_bisector": "∠ Phân giác",
             "parallel": "∥ Đường song song", "perpendicular": "⊥ Đường vuông góc",
             "compass": "◎ Đường tròn bán kính = đoạn",
+            "point_reflect": "⊕ Đối xứng tâm", "axis_reflect": "⇋ Đối xứng trục",
+            "rotate": "↻ Phép quay", "homothety": "⤢ Phép vị tự",
             "circumcircle": "⊙ Ngoại tiếp", "rename_point": "Aa Đặt tên điểm",
             "measure": "📐 Đo đạc",
             # Shape tools

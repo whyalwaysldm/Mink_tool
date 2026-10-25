@@ -20,6 +20,8 @@ from .circumcircle_tool import CircumcircleTool
 from .rename_point_tool import RenamePointTool
 from .measure_tool import MeasureTool
 from .parallel_tool import ParallelTool, PerpendicularTool, CompassTool
+from .transform_tool import (PointReflectTool, AxisReflectTool,
+                             RotateTool, HomothetyTool)
 
 _DEFAULT_SHORTCUTS = {
     "Escape": "select", "S": "segment", "L": "line", "R": "ray",
@@ -72,7 +74,9 @@ class ToolManager(QObject):
         # Geometry construction tools
         for cls in (MidpointTool, AngleBisectorTool, CircumcircleTool,
                     RenamePointTool, MeasureTool,
-                    ParallelTool, PerpendicularTool, CompassTool):
+                    ParallelTool, PerpendicularTool, CompassTool,
+                    PointReflectTool, AxisReflectTool, RotateTool,
+                    HomothetyTool):
             self._tools[cls.name] = mk(cls)
         self._current_name = "select"
         self._current_tool = self._tools["select"]

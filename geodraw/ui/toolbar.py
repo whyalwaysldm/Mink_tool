@@ -68,6 +68,12 @@ TOOLBAR_LAYOUT = [
         ("rename_point",   "Aa", "Đặt tên điểm (N)"),
     ])),
     ("tool",  ("measure",  "📐", "Đo đạc (D)")),
+    ("group", ("Biến hình", [
+        ("point_reflect",  "⊕",  "Đối xứng tâm"),
+        ("axis_reflect",   "⇋",  "Đối xứng trục"),
+        ("rotate",         "↻",  "Phép quay"),
+        ("homothety",      "⤢",  "Phép vị tự"),
+    ])),
     ("separator", None),
     ("tool",  ("ink",      "✏",  "Bút vẽ (I)")),
     ("tool",  ("erase",    "⌫",  "Xóa (E)")),

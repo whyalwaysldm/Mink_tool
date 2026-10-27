@@ -122,22 +122,6 @@ class SquareTool(PresetShapeTool):
         return [p0, p1, p2, p3]
 
 
-class EquilateralTriangleTool(PresetShapeTool):
-    name = "equilateral_triangle"
-    shape_label = "Tam giác đều"
-
-    def compute_vertices(self, anchor, current):
-        r = _dist(anchor, current)
-        if r < 1:
-            return []
-        angle = math.atan2(current.y() - anchor.y(), current.x() - anchor.x())
-        return [
-            QPointF(anchor.x() + r * math.cos(angle + i * 2 * math.pi / 3),
-                    anchor.y() + r * math.sin(angle + i * 2 * math.pi / 3))
-            for i in range(3)
-        ]
-
-
 class RightTriangleTool(PresetShapeTool):
     name = "right_triangle"
     shape_label = "Tam giác vuông"
@@ -205,32 +189,25 @@ class ParallelogramTool(PresetShapeTool):
         return [p0, p1, p2, p3]
 
 
-class IsoscelesTriangleTool(PresetShapeTool):
+class _ThreeClickTriangleTool(PresetShapeTool):
     """
-    Tam giác cân vẽ bằng 3 click:
-      1. đỉnh (đỉnh cân)   2. đỉnh đáy thứ nhất
-      3. đỉnh đáy thứ hai — tự đặt sao cho 2 cạnh bên bằng nhau,
-         hướng theo con trỏ (góc ở đỉnh lớn / nhỏ tùy chỗ click).
+    Tam giác vẽ bằng 3 click: đỉnh 1, đỉnh 2, rồi click thứ ba chọn đỉnh 3
+    (đỉnh 3 được đặt theo tính chất của loại tam giác, xem _third).
     """
-    name = "isosceles_triangle"
-    shape_label = "Tam giác cân"
+    hints = ("", "", "")         # gợi ý trước click 1, 2, 3
+    done_hint = ""
 
     def activate(self):
         super().activate()
         self._clicks: list = []
-        self.tm.status_hint.emit("Tam giác cân: click đỉnh (đỉnh cân)")
+        self.tm.status_hint.emit(self.hints[0])
 
     def deactivate(self):
         super().deactivate()
         self._clicks = []
 
     def _third(self, m: QPointF) -> QPointF:
-        """Đỉnh đáy thứ hai: cách đỉnh cân bằng cạnh bên, theo hướng con trỏ."""
-        a, b = self._clicks
-        r = _dist(a, b)
-        d = _dist(a, m) or 1.0
-        return QPointF(a.x() + (m.x() - a.x()) * r / d,
-                       a.y() + (m.y() - a.y()) * r / d)
+        raise NotImplementedError
 
     def press(self, pos: QPointF, button, modifiers):
         if button != Qt.MouseButton.LeftButton:
@@ -242,9 +219,7 @@ class IsoscelesTriangleTool(PresetShapeTool):
             return
         if len(clicks) < 2:
             clicks.append(QPointF(pos))
-            self.tm.status_hint.emit(
-                "Tam giác cân: click đỉnh đáy thứ nhất" if len(clicks) == 1 else
-                "Tam giác cân: click đỉnh đáy thứ hai (di chuột để chỉnh góc ở đỉnh)")
+            self.tm.status_hint.emit(self.hints[len(clicks)])
             return
         c = self._third(pos)
         if _dist(c, clicks[1]) < 3:
@@ -258,9 +233,7 @@ class IsoscelesTriangleTool(PresetShapeTool):
         edges = [SegmentItem(vertices[k], vertices[(k + 1) % 3]) for k in range(3)]
         item = ShapeItem(vertices, self.shape_label, kind=self.name, edges=edges)
         self.history.push_add_batch(self.scene, vertices + [item] + edges)
-        self.tm.status_hint.emit(
-            "✓ Tam giác cân — kéo đỉnh đáy để đổi góc; "
-            "chuột phải vào tam giác (công cụ Chọn) để nhập số đo góc")
+        self.tm.status_hint.emit(self.done_hint)
 
     def move(self, pos: QPointF, modifiers):
         clicks = getattr(self, "_clicks", [])
@@ -274,6 +247,53 @@ class IsoscelesTriangleTool(PresetShapeTool):
 
     def release(self, pos: QPointF, button):
         pass
+
+
+class EquilateralTriangleTool(_ThreeClickTriangleTool):
+    """
+    Tam giác đều vẽ bằng 3 click: đỉnh 1, đỉnh 2 (cạnh đáy), rồi click về
+    phía muốn đặt đỉnh 3 — đỉnh 3 tự đặt để 3 cạnh bằng nhau.
+    """
+    name = "equilateral_triangle"
+    shape_label = "Tam giác đều"
+    hints = ("Tam giác đều: click đỉnh thứ nhất",
+             "Tam giác đều: click đỉnh thứ hai",
+             "Tam giác đều: click về phía đặt đỉnh thứ ba")
+    done_hint = "✓ Tam giác đều — kéo đỉnh để đổi cỡ / xoay"
+
+    def _third(self, m: QPointF) -> QPointF:
+        """Đỉnh thứ ba (2 vị trí đối xứng qua cạnh đáy) — phía con trỏ."""
+        a, b = self._clicks
+        mx, my = (a.x() + b.x()) / 2, (a.y() + b.y()) / 2
+        k = math.sqrt(3) / 2
+        nx, ny = -(b.y() - a.y()) * k, (b.x() - a.x()) * k
+        if (m.x() - mx) * nx + (m.y() - my) * ny < 0:
+            nx, ny = -nx, -ny
+        return QPointF(mx + nx, my + ny)
+
+
+class IsoscelesTriangleTool(_ThreeClickTriangleTool):
+    """
+    Tam giác cân vẽ bằng 3 click:
+      1. đỉnh (đỉnh cân)   2. đỉnh đáy thứ nhất
+      3. đỉnh đáy thứ hai — tự đặt sao cho 2 cạnh bên bằng nhau,
+         hướng theo con trỏ (góc ở đỉnh lớn / nhỏ tùy chỗ click).
+    """
+    name = "isosceles_triangle"
+    shape_label = "Tam giác cân"
+    hints = ("Tam giác cân: click đỉnh (đỉnh cân)",
+             "Tam giác cân: click đỉnh đáy thứ nhất",
+             "Tam giác cân: click đỉnh đáy thứ hai (di chuột để chỉnh góc ở đỉnh)")
+    done_hint = ("✓ Tam giác cân — kéo đỉnh đáy để đổi góc; "
+                 "chuột phải vào tam giác (công cụ Chọn) để nhập số đo góc")
+
+    def _third(self, m: QPointF) -> QPointF:
+        """Đỉnh đáy thứ hai: cách đỉnh cân bằng cạnh bên, theo hướng con trỏ."""
+        a, b = self._clicks
+        r = _dist(a, b)
+        d = _dist(a, m) or 1.0
+        return QPointF(a.x() + (m.x() - a.x()) * r / d,
+                       a.y() + (m.y() - a.y()) * r / d)
 
 
 class TrapezoidTool(PresetShapeTool):

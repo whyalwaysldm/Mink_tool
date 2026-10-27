@@ -2,14 +2,15 @@
 Công cụ biến hình: đối xứng tâm, đối xứng trục, phép quay, phép vị tự.
 
 Cách dùng:
-  1. Đánh dấu: click 1 điểm làm TÂM (chỗ trống → tạo điểm mới),
-     hoặc click 1 đoạn / đường thẳng / tia làm TRỤC (đối xứng trục).
+  1. Đánh dấu (chuột phải — ở công cụ Chọn hoặc ngay trong công cụ biến hình):
+     chuột phải vào điểm → "Đánh dấu tâm"; vào đoạn / đường thẳng / tia →
+     "Đánh dấu trục"; vào chỗ trống → tạo điểm mới làm tâm.
      Tâm đã đánh dấu dùng chung cho đối xứng tâm, phép quay, vị tự.
-  2. Click đối tượng (điểm, đoạn, đường, đường tròn, đa giác, hình mẫu…)
-     → tạo ảnh của nó. Click bên trong hình mẫu → biến hình cả hình.
-  • Chọn sẵn nhiều đối tượng (Ctrl + click bằng công cụ Chọn) rồi bật công cụ:
-    sau khi có tâm / trục, cả nhóm được biến hình cùng lúc.
-  • Click lại tâm / trục đang đánh dấu → bỏ đánh dấu để chọn cái khác.
+  2. Bật công cụ, click đối tượng (điểm, đoạn, đường, đường tròn, đa giác,
+     hình mẫu…) → tạo ảnh của nó. Click bên trong hình mẫu → cả hình.
+  • Chọn sẵn nhiều đối tượng (công cụ Chọn) rồi bật công cụ: nếu đã có
+    tâm / trục, cả nhóm được biến hình ngay; chưa có thì biến hình ngay
+    sau khi đánh dấu.
 """
 from PyQt6.QtCore import Qt, QPointF, QRectF
 from PyQt6.QtGui import QPen, QBrush, QColor, QTransform
@@ -67,6 +68,58 @@ class _MarkOverlay:
 _overlay = _MarkOverlay()
 
 
+def marked(key: str):
+    """Tâm ("center") / trục ("axis") đang đánh dấu, None nếu chưa có / đã xóa."""
+    it = _marks[key]
+    if it is not None and it.scene() is None:
+        _marks[key] = None
+    return _marks[key]
+
+
+def add_mark_actions(menu, scene, history, pos: QPointF, hits: list,
+                     on_change=None):
+    """
+    Thêm vào menu chuột phải các mục đánh dấu tâm / trục cho phép biến hình.
+    on_change(msg) được gọi sau khi đánh dấu thay đổi.
+    """
+    def set_mark(key, item, msg):
+        _marks[key] = item
+        if on_change:
+            on_change(msg)
+
+    def new_center():
+        _, spos = scene.snap(pos)
+        c = scene.new_point(spos)
+        scene.addItem(c)
+        history.push_add(scene, c)
+        set_mark("center", c, "✓ Đã tạo điểm và đánh dấu làm tâm")
+
+    snapped, _ = scene.snap(pos)
+    pt = snapped if isinstance(snapped, PointItem) else \
+        next((it for it in hits if isinstance(it, PointItem)), None)
+    line = next((it for it in hits if isinstance(it, _LINE_TYPES)), None)
+    if menu.actions():
+        menu.addSeparator()
+    if pt is not None:
+        name = f" {pt.label}" if pt.label else ""
+        menu.addAction(f"Đánh dấu tâm{name} (đối xứng tâm / quay / vị tự)") \
+            .triggered.connect(lambda: set_mark(
+                "center", pt, "✓ Đã đánh dấu tâm — dùng đối xứng tâm, "
+                              "phép quay hoặc vị tự rồi click đối tượng"))
+    if line is not None:
+        menu.addAction("Đánh dấu trục đối xứng").triggered.connect(
+            lambda: set_mark("axis", line, "✓ Đã đánh dấu trục — dùng đối xứng "
+                                           "trục rồi click đối tượng"))
+    if pt is None and line is None:
+        menu.addAction("Tạo điểm tại đây làm tâm").triggered.connect(new_center)
+    if marked("center") is not None:
+        menu.addAction("Bỏ đánh dấu tâm").triggered.connect(
+            lambda: set_mark("center", None, "Đã bỏ đánh dấu tâm"))
+    if marked("axis") is not None:
+        menu.addAction("Bỏ đánh dấu trục").triggered.connect(
+            lambda: set_mark("axis", None, "Đã bỏ đánh dấu trục"))
+
+
 class _TransformTool(BaseTool):
     kind = ""
     title = ""
@@ -86,11 +139,7 @@ class _TransformTool(BaseTool):
         return Transform(self.kind, center=_marks["center"])
 
     def _marked(self):
-        key = "axis" if self.kind == AXIS_REFLECT else "center"
-        it = _marks[key]
-        if it is not None and it.scene() is None:      # đã bị xóa
-            _marks[key] = None
-        return _marks[key]
+        return marked("axis" if self.kind == AXIS_REFLECT else "center")
 
     # ── Lifecycle ─────────────────────────────────────────────────────
     def activate(self):
@@ -109,16 +158,19 @@ class _TransformTool(BaseTool):
         self._pending = []
 
     def _hint(self):
-        what = "trục (đoạn / đường thẳng / tia)" if self.kind == AXIS_REFLECT \
-            else "tâm (điểm)"
+        axis = self.kind == AXIS_REFLECT
+        what = "đoạn / đường thẳng / tia → Đánh dấu trục" if axis \
+            else "điểm → Đánh dấu tâm"
         if self._marked() is None:
             extra = f" — sẽ áp dụng cho {len(self._pending)} đối tượng đã chọn" \
                 if self._pending else ""
-            self.tm.status_hint.emit(f"{self.title}: click để đánh dấu {what}{extra}")
+            self.tm.status_hint.emit(
+                f"{self.title}: chưa có {'trục' if axis else 'tâm'}"
+                f" — chuột phải vào {what}{extra}")
         else:
             self.tm.status_hint.emit(
                 f"{self.title}: click đối tượng để tạo ảnh ({SUPPORTED_HINT})"
-                "  |  click lại tâm / trục để đánh dấu lại")
+                "  |  chuột phải để đổi tâm / trục")
 
     # ── Hit-test ──────────────────────────────────────────────────────
     def _items_at(self, pos: QPointF) -> list:
@@ -147,17 +199,19 @@ class _TransformTool(BaseTool):
 
     # ── Events ────────────────────────────────────────────────────────
     def press(self, pos: QPointF, button, modifiers):
+        if button == Qt.MouseButton.RightButton:
+            self._context_menu(pos)
+            return
         if button != Qt.MouseButton.LeftButton:
             return
         if self._marked() is None:
-            self._mark(pos)
+            self._hint()
             return
         obj = self._object_at(pos)
         if obj is not None and obj is self._marked():
-            # Click lại tâm / trục đang đánh dấu → bỏ đánh dấu
-            _marks["axis" if self.kind == AXIS_REFLECT else "center"] = None
-            _overlay.hide()
-            self._hint()
+            what = "trục" if self.kind == AXIS_REFLECT else "tâm"
+            self.tm.status_hint.emit(
+                f"{self.title}: đây là {what} đang đánh dấu — click đối tượng khác")
             return
         if obj is None:
             self.tm.status_hint.emit(
@@ -169,26 +223,16 @@ class _TransformTool(BaseTool):
             obj = shp
         self._apply([obj])
 
-    def _mark(self, pos: QPointF):
-        new_items = []
-        if self.kind == AXIS_REFLECT:
-            hits = [it for it in self._items_at(pos) if isinstance(it, _LINE_TYPES)]
-            if not hits:
-                self.tm.status_hint.emit(
-                    f"{self.title}: hãy click vào đoạn / đường thẳng / tia làm trục")
-                return
-            _marks["axis"] = hits[0]
-        else:
-            snapped, spos = self.scene.snap(pos)
-            if isinstance(snapped, PointItem):
-                _marks["center"] = snapped
-            else:
-                c = self.scene.new_point(spos)
-                self.scene.addItem(c)
-                self.history.push_add(self.scene, c)
-                _marks["center"] = c
+    def _context_menu(self, pos: QPointF):
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QCursor
+        view = self.scene.views()[0] if self.scene.views() else None
+        menu = QMenu(view)
+        add_mark_actions(menu, self.scene, self.history, pos, self._items_at(pos))
+        if menu.exec(QCursor.pos()) is None:
+            return
         _overlay.show(self.scene, self.kind)
-        if self._pending:
+        if self._marked() is not None and self._pending:
             self._apply(self._pending)
             self._pending = []
         self._hint()

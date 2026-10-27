@@ -200,16 +200,19 @@ class SelectTool(BaseTool):
 
     def _context_menu(self, pos: QPointF):
         from tools.triangle_angles import triangle_at, edit_triangle_angles
-        tri = triangle_at(self.scene, self._geo_items_at(pos))
-        if tri is None:
-            return
+        from tools.transform_tool import add_mark_actions
         from PyQt6.QtWidgets import QMenu
         from PyQt6.QtGui import QCursor
+        hits = self._geo_items_at(pos)
+        tri = triangle_at(self.scene, hits)
         view = self.scene.views()[0] if self.scene.views() else None
         menu = QMenu(view)
-        act = menu.addAction("Nhập số đo góc…")
-        if menu.exec(QCursor.pos()) is act:
-            edit_triangle_angles(tri, self.scene, self.history)
+        if tri is not None:
+            menu.addAction("Nhập số đo góc…").triggered.connect(
+                lambda: edit_triangle_angles(tri, self.scene, self.history))
+        add_mark_actions(menu, self.scene, self.history, pos, hits,
+                         on_change=self.tm.status_hint.emit)
+        menu.exec(QCursor.pos())
 
     # ── Kéo cả vùng chọn: di chuyển cứng (giữ nguyên hình dạng) ──────
 

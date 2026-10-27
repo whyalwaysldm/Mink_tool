@@ -70,7 +70,7 @@ class CircumcircleTool(BaseTool):
         if snapped_item:
             pt, is_new = snapped_item, False
         else:
-            pt = PointItem(snapped_pos)
+            pt = self.scene.new_point(snapped_pos)
             self.scene.addItem(pt)
             is_new = True
 

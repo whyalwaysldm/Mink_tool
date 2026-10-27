@@ -13,7 +13,7 @@ class PointTool(BaseTool):
         if snapped_item:
             return  # điểm đã tồn tại — không tạo trùng
 
-        pt = PointItem(snapped_pos)
+        pt = self.scene.new_point(snapped_pos)
         self.scene.addItem(pt)
 
         # ── Tự động tạo đoạn từ pt đến các điểm cùng đường/đoạn ──────

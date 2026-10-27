@@ -98,7 +98,10 @@ class _ThroughPointTool(BaseTool):
             return []                 # song song qua điểm nằm trên đường = chính nó
         helper = DirectionPointItem(a, line.p1, line.p2, self.perpendicular)
         items = [helper, LineItem(a, helper)]
-        if self.perpendicular:
+        on_line = (a is line.p1 or a is line.p2 or
+                   getattr(a, 'host', None) is line)
+        if self.perpendicular and not on_line:
+            # Điểm nằm trên đường → chân đường vuông góc trùng chính nó
             items.append(FootPointItem(a, line.p1, line.p2))
         return items
 
@@ -144,7 +147,7 @@ class _ThroughPointTool(BaseTool):
         if isinstance(snapped_item, PointItem):
             pt = snapped_item
         else:
-            pt = PointItem(snapped_pos)
+            pt = self.scene.new_point(snapped_pos)
             self.scene.addItem(pt)
             self._new_pts.append(pt)
 

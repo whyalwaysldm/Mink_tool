@@ -166,6 +166,20 @@ class GeoScene(QGraphicsScene):
         from utils.snap_engine import snap as _snap
         return _snap(pos, self, exclude)
 
+    def new_point(self, pos, color=None):
+        """
+        Điểm mới tại pos (vị trí đã snap). Nếu pos nằm trên một đường
+        → PointOnCurveItem gắn vào đường đó (kéo chỉ trượt trên đường,
+        đi theo khi đường di chuyển); ngược lại → điểm tự do.
+        """
+        r = self.snap_info(pos)
+        if r.snap_type == "on_curve" and r.host is not None:
+            from items.on_curve import PointOnCurveItem, anchor_points
+            anchors = anchor_points(self, r.host)
+            if anchors:
+                return PointOnCurveItem(r.host, r.host_idx, r.pos, anchors, color)
+        return PointItem(pos, color)
+
     # ── Mouse events → active tool ────────────────────────────────────────
 
     def mousePressEvent(self, event):

@@ -24,13 +24,18 @@ class SnapResult:
     item       – PointItem nếu snap vào điểm có sẵn, None nếu giao điểm/tự do
     pos        – vị trí snap chính xác
     snap_type  – "point" | "intersection" | "on_curve" | "free"
+    host       – (chỉ với "on_curve") đối tượng chứa điểm snap
+    host_idx   – chỉ số curve trong curves_of(host) (cạnh đa giác…)
     """
-    __slots__ = ("item", "pos", "snap_type")
+    __slots__ = ("item", "pos", "snap_type", "host", "host_idx")
 
-    def __init__(self, item, pos: QPointF, snap_type: str):
+    def __init__(self, item, pos: QPointF, snap_type: str,
+                 host=None, host_idx: int = 0):
         self.item      = item
         self.pos       = pos
         self.snap_type = snap_type
+        self.host      = host
+        self.host_idx  = host_idx
 
 
 # ── Hàm chính ────────────────────────────────────────────────────────────────
@@ -55,7 +60,7 @@ def snap(pos: QPointF, scene, exclude=None) -> SnapResult:
         return SnapResult(best_item, best_item.scenePos(), "point")
 
     # Thu thập đường một lần, dùng cho cả giao điểm lẫn on_curve
-    curves = _collect_curves(scene)
+    curves, hosts = _collect_curves(scene)
 
     # ── 2. Giao điểm của các đường đã vẽ ────────────────────────────────
     best_ipt = None
@@ -73,16 +78,18 @@ def snap(pos: QPointF, scene, exclude=None) -> SnapResult:
 
     # ── 3. Điểm gần nhất trên đường / đoạn / tia / đường tròn ──────────
     best_foot = None
+    best_host = (None, 0)
     best_d    = ON_CURVE_DIST          # dùng khoảng cách vuông góc
-    for curve in curves:
+    for curve, host in zip(curves, hosts):
         foot = _nearest_on_curve(pos, curve)
         if foot is not None:
             d = distance(pos, foot)
             if d < best_d:
                 best_d    = d
                 best_foot = foot
+                best_host = host
     if best_foot is not None:
-        return SnapResult(None, best_foot, "on_curve")
+        return SnapResult(None, best_foot, "on_curve", *best_host)
 
     # ── 4. Tự do ─────────────────────────────────────────────────────────
     return SnapResult(None, pos, "free")
@@ -92,7 +99,18 @@ def snap(pos: QPointF, scene, exclude=None) -> SnapResult:
 # Mỗi "curve" là một tuple: ('segment'|'line'|'ray', p1, p2)
 #                       hoặc ('circle', center_QPointF, radius_float)
 
-def _collect_curves(scene) -> list:
+def _collect_curves(scene) -> tuple:
+    """(curves, hosts) — hosts[i] = (item, chỉ số curve trong curves_of(item))."""
+    curves, hosts = [], []
+    for item in scene.items():
+        for k, c in enumerate(curves_of(item)):
+            curves.append(c)
+            hosts.append((item, k))
+    return curves, hosts
+
+
+def curves_of(item) -> list:
+    """Các curve của một đối tượng (rỗng nếu không phải đường)."""
     from items.segment import SegmentItem
     from items.line import LineItem, RayItem
     from items.circle import CircleItem
@@ -103,50 +121,49 @@ def _collect_curves(scene) -> list:
     from items.bisector_ray import BisectorRayItem   # tia phân giác
 
     curves = []
-    for item in scene.items():
-        if isinstance(item, SegmentItem):
-            curves.append(('segment', item.p1.scenePos(), item.p2.scenePos()))
+    if isinstance(item, SegmentItem):
+        curves.append(('segment', item.p1.scenePos(), item.p2.scenePos()))
 
-        elif isinstance(item, RayItem):          # phải trước LineItem
-            curves.append(('ray', item.p1.scenePos(), item.p2.scenePos()))
+    elif isinstance(item, RayItem):          # phải trước LineItem
+        curves.append(('ray', item.p1.scenePos(), item.p2.scenePos()))
 
-        elif isinstance(item, LineItem):
-            curves.append(('line', item.p1.scenePos(), item.p2.scenePos()))
+    elif isinstance(item, LineItem):
+        curves.append(('line', item.p1.scenePos(), item.p2.scenePos()))
 
-        elif isinstance(item, CircleItem):
-            c = item.center_pt.scenePos()
-            r = item._radius()
-            if r > 0.5:
-                curves.append(('circle', c, r))
+    elif isinstance(item, CircleItem):
+        c = item.center_pt.scenePos()
+        r = item._radius()
+        if r > 0.5:
+            curves.append(('circle', c, r))
 
-        elif isinstance(item, CircumcircleItem):
-            c, r = item._data()
-            if c is not None and r > 0.5:
-                curves.append(('circle', c, r))
+    elif isinstance(item, CircumcircleItem):
+        c, r = item._data()
+        if c is not None and r > 0.5:
+            curves.append(('circle', c, r))
 
-        elif isinstance(item, ArcItem):
-            # Dùng toàn bộ đường tròn chứa cung (đủ cho snap)
-            c, r = item._circle_from_3pts(
-                item.p_start.scenePos(),
-                item.p_mid.scenePos(),
-                item.p_end.scenePos())
-            if c is not None and r > 0.5:
-                curves.append(('circle', c, r))
+    elif isinstance(item, ArcItem):
+        # Dùng toàn bộ đường tròn chứa cung (đủ cho snap)
+        c, r = item._circle_from_3pts(
+            item.p_start.scenePos(),
+            item.p_mid.scenePos(),
+            item.p_end.scenePos())
+        if c is not None and r > 0.5:
+            curves.append(('circle', c, r))
 
-        elif isinstance(item, BisectorRayItem):
-            v = item._vertex.scenePos()
-            d = item._bisector_dir()
-            # Biểu diễn tia phân giác dưới dạng ('ray', origin, p2)
-            curves.append(('ray', v,
-                           QPointF(v.x() + d.x(), v.y() + d.y())))
+    elif isinstance(item, BisectorRayItem):
+        v = item._vertex.scenePos()
+        d = item._bisector_dir()
+        # Biểu diễn tia phân giác dưới dạng ('ray', origin, p2)
+        curves.append(('ray', v,
+                       QPointF(v.x() + d.x(), v.y() + d.y())))
 
-        elif isinstance(item, PolygonItem):
-            pts = [p.scenePos() for p in item.points]
-            _add_poly_edges(curves, pts, item.closed)
+    elif isinstance(item, PolygonItem):
+        pts = [p.scenePos() for p in item.points]
+        _add_poly_edges(curves, pts, item.closed)
 
-        elif isinstance(item, FixedPolygonItem):
-            pts = [item.mapToScene(p) for p in item._points]
-            _add_poly_edges(curves, pts, closed=True)
+    elif isinstance(item, FixedPolygonItem):
+        pts = [item.mapToScene(p) for p in item._points]
+        _add_poly_edges(curves, pts, closed=True)
 
     return curves
 

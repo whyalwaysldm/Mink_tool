@@ -79,7 +79,9 @@ class SelectTool(BaseTool):
         from items.segment import SegmentItem
         if isinstance(item, PointItem):
             sp = item.scenePos()
-            return (0, 0.0, sp.x(), sp.y())
+            # Điểm kéo được trước điểm dựng hình trùng chỗ (chân đường cao…)
+            fixed = 1.0 if getattr(item, 'is_constrained', False) else 0.0
+            return (0, fixed, sp.x(), sp.y())
         if isinstance(item, SegmentItem):
             sp1, sp2 = item.p1.scenePos(), item.p2.scenePos()
             mx = (sp1.x() + sp2.x()) / 2
@@ -257,7 +259,9 @@ class SelectTool(BaseTool):
             else:
                 for p in deps_of[it]:
                     add(p)
-        return out
+        # Điểm trên đường có đường cũng được kéo → tự đi theo đường
+        return [p for p in out
+                if not any(a in out for a in getattr(p, "_anchors", ()))]
 
     # ── Quét chọn ─────────────────────────────────────────────────────
 

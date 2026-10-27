@@ -53,7 +53,7 @@ class _TwoPointTool(BaseTool):
             if snapped_item:
                 self._p1, self._p1_new = snapped_item, False
             else:
-                pt = PointItem(snapped_pos)
+                pt = self.scene.new_point(snapped_pos)
                 self.scene.addItem(pt)
                 self._p1, self._p1_new = pt, True
             self._ensure_ghost()
@@ -63,7 +63,7 @@ class _TwoPointTool(BaseTool):
             if snapped_item:
                 pt2, pt2_new = snapped_item, False
             else:
-                pt2 = PointItem(snapped_pos)
+                pt2 = self.scene.new_point(snapped_pos)
                 self.scene.addItem(pt2)
                 pt2_new = True
 

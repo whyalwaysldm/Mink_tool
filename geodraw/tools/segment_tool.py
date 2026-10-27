@@ -52,7 +52,7 @@ class SegmentTool(BaseTool):
                 self._p1 = snapped_item
                 self._p1_new = False
             else:
-                pt = PointItem(snapped_pos)
+                pt = self.scene.new_point(snapped_pos)
                 self.scene.addItem(pt)
                 self._p1 = pt
                 self._p1_new = True
@@ -64,7 +64,7 @@ class SegmentTool(BaseTool):
                 pt2 = snapped_item
                 pt2_new = False
             else:
-                pt2 = PointItem(snapped_pos)
+                pt2 = self.scene.new_point(snapped_pos)
                 self.scene.addItem(pt2)
                 pt2_new = True
 

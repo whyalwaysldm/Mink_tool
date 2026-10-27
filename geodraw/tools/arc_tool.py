@@ -34,7 +34,7 @@ class ArcTool(BaseTool):
             self.activate()
             return
         snapped_item, snapped_pos = self.scene.snap(pos)
-        pt = snapped_item or PointItem(snapped_pos)
+        pt = snapped_item or self.scene.new_point(snapped_pos)
         is_new = snapped_item is None
         if is_new:
             self.scene.addItem(pt)

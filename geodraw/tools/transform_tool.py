@@ -183,7 +183,7 @@ class _TransformTool(BaseTool):
             if isinstance(snapped, PointItem):
                 _marks["center"] = snapped
             else:
-                c = PointItem(spos)
+                c = self.scene.new_point(spos)
                 self.scene.addItem(c)
                 self.history.push_add(self.scene, c)
                 _marks["center"] = c

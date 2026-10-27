@@ -54,7 +54,7 @@ class CircleTool(BaseTool):
                 self._center = snapped_item
                 self._center_new = False
             else:
-                pt = PointItem(snapped_pos)
+                pt = self.scene.new_point(snapped_pos)
                 self.scene.addItem(pt)
                 self._center = pt
                 self._center_new = True
@@ -64,7 +64,7 @@ class CircleTool(BaseTool):
                 rpt = snapped_item
                 rpt_new = False
             else:
-                rpt = PointItem(snapped_pos)
+                rpt = self.scene.new_point(snapped_pos)
                 self.scene.addItem(rpt)
                 rpt_new = True
 

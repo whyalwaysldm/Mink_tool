@@ -82,7 +82,7 @@ class MidpointTool(BaseTool):
                 self._p1 = snapped_item
                 self._p1_new = False
             else:
-                self._p1 = PointItem(snapped_pos)
+                self._p1 = self.scene.new_point(snapped_pos)
                 self.scene.addItem(self._p1)
                 self._p1_new = True
 
@@ -97,7 +97,7 @@ class MidpointTool(BaseTool):
                 pt2 = snapped_item
                 pt2_new = False
             else:
-                pt2 = PointItem(snapped_pos)
+                pt2 = self.scene.new_point(snapped_pos)
                 self.scene.addItem(pt2)
                 pt2_new = True
 

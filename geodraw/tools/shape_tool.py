@@ -95,106 +95,51 @@ class PresetShapeTool(BaseTool):
         self.move(pos, Qt.KeyboardModifier.NoModifier)
 
 
-# ── Các hình cụ thể ─────────────────────────────────────────────────────────
+# ── Vẽ bằng click vào các đỉnh ─────────────────────────────────────────────
 
-class RectangleTool(PresetShapeTool):
-    name = "rectangle"
-    shape_label = "Hình chữ nhật"
-
-    def compute_vertices(self, anchor, current):
-        x0, y0 = anchor.x(), anchor.y()
-        x1, y1 = current.x(), current.y()
-        return [QPointF(x0, y0), QPointF(x1, y0),
-                QPointF(x1, y1), QPointF(x0, y1)]
+def _sub(a: QPointF, b: QPointF) -> QPointF:
+    return QPointF(a.x() - b.x(), a.y() - b.y())
 
 
-class SquareTool(PresetShapeTool):
-    name = "square"
-    shape_label = "Hình vuông"
-
-    def compute_vertices(self, anchor, current):
-        dx = current.x() - anchor.x()
-        dy = current.y() - anchor.y()
-        p0 = anchor
-        p1 = current
-        p2 = QPointF(current.x() - dy, current.y() + dx)
-        p3 = QPointF(anchor.x() - dy, anchor.y() + dx)
-        return [p0, p1, p2, p3]
+def _cross(u: QPointF, v: QPointF) -> float:
+    return u.x() * v.y() - u.y() * v.x()
 
 
-class RightTriangleTool(PresetShapeTool):
-    name = "right_triangle"
-    shape_label = "Tam giác vuông"
-
-    def compute_vertices(self, anchor, current):
-        # góc vuông tại anchor, 2 cạnh góc vuông theo trục
-        return [anchor,
-                QPointF(current.x(), anchor.y()),
-                QPointF(anchor.x(), current.y())]
+def _height(a: QPointF, b: QPointF, m: QPointF) -> float:
+    """Khoảng cách từ m tới đường thẳng AB."""
+    return abs(_cross(_sub(b, a), _sub(m, a))) / (_dist(a, b) or 1.0)
 
 
-class IsoscelesRightTriangleTool(PresetShapeTool):
-    name = "isosceles_right_triangle"
-    shape_label = "Tam giác vuông cân"
-
-    def compute_vertices(self, anchor, current):
-        # góc vuông tại anchor, 2 cạnh bằng nhau, hướng theo drag ±45°
-        dx = current.x() - anchor.x()
-        dy = current.y() - anchor.y()
-        leg = math.sqrt(dx*dx + dy*dy)
-        if leg < 1:
-            return []
-        base_angle = math.atan2(dy, dx)
-        p1 = QPointF(anchor.x() + leg * math.cos(base_angle + math.pi/4),
-                     anchor.y() + leg * math.sin(base_angle + math.pi/4))
-        p2 = QPointF(anchor.x() + leg * math.cos(base_angle - math.pi/4),
-                     anchor.y() + leg * math.sin(base_angle - math.pi/4))
-        return [anchor, p1, p2]
+def _normal(a: QPointF, b: QPointF, m: QPointF) -> QPointF:
+    """Vector đơn vị vuông góc với AB, hướng về phía con trỏ m."""
+    u = _sub(b, a)
+    L = _dist(a, b) or 1.0
+    n = QPointF(-u.y() / L, u.x() / L)
+    return n if _cross(u, _sub(m, a)) >= 0 else QPointF(-n.x(), -n.y())
 
 
-class RhombusTool(PresetShapeTool):
-    name = "rhombus"
-    shape_label = "Hình thoi"
-
-    def compute_vertices(self, anchor, current):
-        # anchor = tâm, drag đến đỉnh
-        dx = current.x() - anchor.x()
-        dy = current.y() - anchor.y()
-        # đường chéo 2 vuông góc, dài bằng 0.65 đường chéo 1
-        r = 0.65
-        p_right  = current
-        p_left   = QPointF(anchor.x() - dx, anchor.y() - dy)
-        p_top    = QPointF(anchor.x() - dy * r, anchor.y() + dx * r)
-        p_bottom = QPointF(anchor.x() + dy * r, anchor.y() - dx * r)
-        return [p_right, p_top, p_left, p_bottom]
+def _regular_on_side(a: QPointF, b: QPointF, m: QPointF, n: int) -> list:
+    """Đa giác đều n cạnh có cạnh AB, nằm về phía con trỏ m."""
+    sign = 1.0 if _cross(_sub(b, a), _sub(m, a)) >= 0 else -1.0
+    th = sign * 2 * math.pi / n
+    ux, uy = b.x() - a.x(), b.y() - a.y()
+    pts = [QPointF(a), QPointF(b)]
+    for k in range(1, n - 1):
+        c, s = math.cos(th * k), math.sin(th * k)
+        last = pts[-1]
+        pts.append(QPointF(last.x() + ux * c - uy * s,
+                           last.y() + ux * s + uy * c))
+    return pts
 
 
-class ParallelogramTool(PresetShapeTool):
-    name = "parallelogram"
-    shape_label = "Hình bình hành"
-
-    def compute_vertices(self, anchor, current):
-        dx = current.x() - anchor.x()
-        dy = current.y() - anchor.y()
-        # cạnh đáy = anchor→current, chiều cao = 0.55 * cạnh đáy,
-        # cạnh bên nghiêng thêm 0.35 * cạnh đáy (nếu không sẽ thành hình chữ nhật)
-        h = 0.55
-        s = 0.35
-        ox = -dy * h + dx * s
-        oy =  dx * h + dy * s
-        p0 = anchor
-        p1 = current
-        p2 = QPointF(current.x() + ox, current.y() + oy)
-        p3 = QPointF(anchor.x() + ox, anchor.y() + oy)
-        return [p0, p1, p2, p3]
-
-
-class _ThreeClickTriangleTool(PresetShapeTool):
+class _ClickShapeTool(PresetShapeTool):
     """
-    Tam giác vẽ bằng 3 click: đỉnh 1, đỉnh 2, rồi click thứ ba chọn đỉnh 3
-    (đỉnh 3 được đặt theo tính chất của loại tam giác, xem _third).
+    Hình vẽ bằng các click: n_clicks − 1 click đặt đỉnh, click cuối chọn phần
+    còn lại (phía đặt hình / độ dài cạnh / đỉnh cuối) — các đỉnh còn lại tự
+    đặt theo đúng tính chất của hình, xem _vertices.
     """
-    hints = ("", "", "")         # gợi ý trước click 1, 2, 3
+    n_clicks = 3
+    hints: tuple = ()            # gợi ý trước mỗi click
     done_hint = ""
 
     def activate(self):
@@ -206,8 +151,16 @@ class _ThreeClickTriangleTool(PresetShapeTool):
         super().deactivate()
         self._clicks = []
 
-    def _third(self, m: QPointF) -> QPointF:
+    def _vertices(self, m: QPointF):
+        """Mọi đỉnh của hình khi click cuối ở m; None nếu chưa hợp lệ."""
         raise NotImplementedError
+
+    def _valid_click(self, pos: QPointF) -> bool:
+        clicks = self._clicks
+        if any(_dist(c, pos) < 5 for c in clicks):
+            return False
+        # Đỉnh thứ ba trở đi không được thẳng hàng với cạnh đầu
+        return len(clicks) < 2 or _height(clicks[0], clicks[1], pos) >= 3
 
     def press(self, pos: QPointF, button, modifiers):
         if button != Qt.MouseButton.LeftButton:
@@ -215,64 +168,158 @@ class _ThreeClickTriangleTool(PresetShapeTool):
         _, pos = self.scene.snap(pos)
         clicks = getattr(self, "_clicks", [])
         self._clicks = clicks
-        if len(clicks) == 1 and _dist(clicks[0], pos) < 5:
+        if len(clicks) < self.n_clicks - 1:
+            if self._valid_click(pos):
+                clicks.append(QPointF(pos))
+                self.tm.status_hint.emit(self.hints[len(clicks)])
             return
-        if len(clicks) < 2:
-            clicks.append(QPointF(pos))
-            self.tm.status_hint.emit(self.hints[len(clicks)])
+        pts = self._vertices(pos)
+        if not pts:
             return
-        c = self._third(pos)
-        if _dist(c, clicks[1]) < 3:
-            return
-        self._build([clicks[0], clicks[1], c])
+        self._build(pts)
         self._clicks = []
         self._remove_ghost()
+        self.tm.status_hint.emit(
+            self.done_hint or f"✓ {self.shape_label} — kéo đỉnh để đổi cỡ / xoay")
 
     def _build(self, pts: list):
         vertices = [PointItem(p) for p in pts]
-        edges = [SegmentItem(vertices[k], vertices[(k + 1) % 3]) for k in range(3)]
+        n = len(vertices)
+        edges = [SegmentItem(vertices[k], vertices[(k + 1) % n]) for k in range(n)]
         item = ShapeItem(vertices, self.shape_label, kind=self.name, edges=edges)
         self.history.push_add_batch(self.scene, vertices + [item] + edges)
-        self.tm.status_hint.emit(self.done_hint)
 
     def move(self, pos: QPointF, modifiers):
         clicks = getattr(self, "_clicks", [])
         if not clicks:
             return
         _, pos = self.scene.snap(pos)
-        if len(clicks) == 1:
-            self._update_ghost([clicks[0], pos])
-        else:
-            self._update_ghost([clicks[0], clicks[1], self._third(pos)])
+        if len(clicks) == self.n_clicks - 1:
+            pts = self._vertices(pos)
+            if pts:
+                self._update_ghost(pts)
+                return
+        self._update_ghost(clicks + [pos])
 
     def release(self, pos: QPointF, button):
         pass
 
 
-class EquilateralTriangleTool(_ThreeClickTriangleTool):
-    """
-    Tam giác đều vẽ bằng 3 click: đỉnh 1, đỉnh 2 (cạnh đáy), rồi click về
-    phía muốn đặt đỉnh 3 — đỉnh 3 tự đặt để 3 cạnh bằng nhau.
-    """
+class _RegularPolygonTool(_ClickShapeTool):
+    """Đa giác đều: click 2 đỉnh của một cạnh, rồi click về phía đặt hình."""
+    sides = 3
+
+    @property
+    def hints(self):
+        return (f"{self.shape_label}: click đỉnh thứ nhất",
+                f"{self.shape_label}: click đỉnh thứ hai",
+                f"{self.shape_label}: click về phía muốn đặt hình")
+
+    def _vertices(self, m):
+        a, b = self._clicks
+        if _height(a, b, m) < 1:
+            return None
+        return _regular_on_side(a, b, m, self.sides)
+
+
+class RectangleTool(_ClickShapeTool):
+    name = "rectangle"
+    shape_label = "Hình chữ nhật"
+    hints = ("Hình chữ nhật: click đỉnh thứ nhất",
+             "Hình chữ nhật: click đỉnh thứ hai",
+             "Hình chữ nhật: click để chọn độ dài cạnh còn lại")
+
+    def _vertices(self, m):
+        a, b = self._clicks
+        h = _height(a, b, m)
+        if h < 3:
+            return None
+        n = _normal(a, b, m)
+        off = QPointF(n.x() * h, n.y() * h)
+        return [a, b, b + off, a + off]
+
+
+class SquareTool(_RegularPolygonTool):
+    name = "square"
+    shape_label = "Hình vuông"
+    sides = 4
+
+
+class EquilateralTriangleTool(_RegularPolygonTool):
     name = "equilateral_triangle"
     shape_label = "Tam giác đều"
-    hints = ("Tam giác đều: click đỉnh thứ nhất",
-             "Tam giác đều: click đỉnh thứ hai",
-             "Tam giác đều: click về phía đặt đỉnh thứ ba")
-    done_hint = "✓ Tam giác đều — kéo đỉnh để đổi cỡ / xoay"
+    sides = 3
 
-    def _third(self, m: QPointF) -> QPointF:
-        """Đỉnh thứ ba (2 vị trí đối xứng qua cạnh đáy) — phía con trỏ."""
+
+class RightTriangleTool(_ClickShapeTool):
+    """Góc vuông tại đỉnh 1; click 3 chọn độ dài cạnh góc vuông thứ hai."""
+    name = "right_triangle"
+    shape_label = "Tam giác vuông"
+    hints = ("Tam giác vuông: click đỉnh góc vuông",
+             "Tam giác vuông: click đỉnh thứ hai",
+             "Tam giác vuông: click để chọn độ dài cạnh góc vuông còn lại")
+
+    def _vertices(self, m):
         a, b = self._clicks
-        mx, my = (a.x() + b.x()) / 2, (a.y() + b.y()) / 2
-        k = math.sqrt(3) / 2
-        nx, ny = -(b.y() - a.y()) * k, (b.x() - a.x()) * k
-        if (m.x() - mx) * nx + (m.y() - my) * ny < 0:
-            nx, ny = -nx, -ny
-        return QPointF(mx + nx, my + ny)
+        h = _height(a, b, m)
+        if h < 3:
+            return None
+        n = _normal(a, b, m)
+        return [a, b, QPointF(a.x() + n.x() * h, a.y() + n.y() * h)]
 
 
-class IsoscelesTriangleTool(_ThreeClickTriangleTool):
+class IsoscelesRightTriangleTool(_ClickShapeTool):
+    """Góc vuông tại đỉnh 1, 2 cạnh góc vuông bằng nhau; click 3 chọn phía."""
+    name = "isosceles_right_triangle"
+    shape_label = "Tam giác vuông cân"
+    hints = ("Tam giác vuông cân: click đỉnh góc vuông",
+             "Tam giác vuông cân: click đỉnh thứ hai",
+             "Tam giác vuông cân: click về phía đặt đỉnh thứ ba")
+
+    def _vertices(self, m):
+        a, b = self._clicks
+        n = _normal(a, b, m)
+        r = _dist(a, b)
+        return [a, b, QPointF(a.x() + n.x() * r, a.y() + n.y() * r)]
+
+
+class RhombusTool(_ClickShapeTool):
+    """Click 2 đỉnh (một cạnh), click 3 chọn hướng cạnh kề (cùng độ dài)."""
+    name = "rhombus"
+    shape_label = "Hình thoi"
+    hints = ("Hình thoi: click đỉnh thứ nhất",
+             "Hình thoi: click đỉnh thứ hai",
+             "Hình thoi: click để chọn hướng cạnh kề (góc của hình thoi)")
+
+    def _vertices(self, m):
+        a, b = self._clicks
+        d = _dist(b, m)
+        if d < 1e-6:
+            return None
+        r = _dist(a, b)
+        c = QPointF(b.x() + (m.x() - b.x()) * r / d,
+                    b.y() + (m.y() - b.y()) * r / d)
+        if _height(a, b, c) < 3:
+            return None               # gần thẳng hàng → hình dẹt
+        return [a, b, c, a + c - b]
+
+
+class ParallelogramTool(_ClickShapeTool):
+    """Click 3 đỉnh liên tiếp; đỉnh thứ tư tự đặt."""
+    name = "parallelogram"
+    shape_label = "Hình bình hành"
+    hints = ("Hình bình hành: click đỉnh thứ nhất",
+             "Hình bình hành: click đỉnh thứ hai",
+             "Hình bình hành: click đỉnh thứ ba (đỉnh thứ tư tự đặt)")
+
+    def _vertices(self, m):
+        a, b = self._clicks
+        if _height(a, b, m) < 3:
+            return None
+        return [a, b, m, a + m - b]
+
+
+class IsoscelesTriangleTool(_ClickShapeTool):
     """
     Tam giác cân vẽ bằng 3 click:
       1. đỉnh (đỉnh cân)   2. đỉnh đáy thứ nhất
@@ -287,66 +334,48 @@ class IsoscelesTriangleTool(_ThreeClickTriangleTool):
     done_hint = ("✓ Tam giác cân — kéo đỉnh đáy để đổi góc; "
                  "chuột phải vào tam giác (công cụ Chọn) để nhập số đo góc")
 
-    def _third(self, m: QPointF) -> QPointF:
+    def _vertices(self, m):
         """Đỉnh đáy thứ hai: cách đỉnh cân bằng cạnh bên, theo hướng con trỏ."""
         a, b = self._clicks
         r = _dist(a, b)
         d = _dist(a, m) or 1.0
-        return QPointF(a.x() + (m.x() - a.x()) * r / d,
-                       a.y() + (m.y() - a.y()) * r / d)
+        c = QPointF(a.x() + (m.x() - a.x()) * r / d,
+                    a.y() + (m.y() - a.y()) * r / d)
+        if _dist(c, b) < 3:
+            return None
+        return [a, b, c]
 
 
-class TrapezoidTool(PresetShapeTool):
+class TrapezoidTool(_ClickShapeTool):
+    """Click 2 đỉnh của đáy, đỉnh thứ ba, rồi đỉnh thứ tư (trên đường song song đáy)."""
     name = "trapezoid"
     shape_label = "Hình thang"
+    n_clicks = 4
+    hints = ("Hình thang: click đỉnh thứ nhất của đáy",
+             "Hình thang: click đỉnh thứ hai của đáy",
+             "Hình thang: click đỉnh thứ ba",
+             "Hình thang: click đỉnh thứ tư (nằm trên đường song song với đáy)")
 
-    def compute_vertices(self, anchor, current):
-        # đáy lớn = anchor → current (theo trục x)
-        x0, y0 = anchor.x(), anchor.y()
-        x1, y1 = current.x(), current.y()
-        width = x1 - x0
-        height = abs(y1 - y0) if abs(y1 - y0) > 5 else abs(width) * 0.6
-        h = -height if y1 < y0 else height
-        # đáy nhỏ = 55% đáy lớn, căn giữa
-        small = width * 0.55
-        offset = (width - small) / 2
-        p0 = QPointF(x0, y0)
-        p1 = QPointF(x1, y0)
-        p2 = QPointF(x0 + offset + small, y0 + h)
-        p3 = QPointF(x0 + offset,         y0 + h)
-        return [p0, p1, p2, p3]
+    def _vertices(self, m):
+        a, b, c = self._clicks
+        u = _sub(b, a)
+        L2 = (u.x() ** 2 + u.y() ** 2) or 1.0
+        t = ((m.x() - c.x()) * u.x() + (m.y() - c.y()) * u.y()) / L2
+        if t > -0.02:
+            return None               # đỉnh thứ tư phải lùi về phía đỉnh thứ nhất
+        return [a, b, c, QPointF(c.x() + u.x() * t, c.y() + u.y() * t)]
 
 
-class RegularHexagonTool(PresetShapeTool):
+class RegularHexagonTool(_RegularPolygonTool):
     name = "hexagon"
     shape_label = "Lục giác đều"
-
-    def compute_vertices(self, anchor, current):
-        r = _dist(anchor, current)
-        if r < 1:
-            return []
-        angle = math.atan2(current.y() - anchor.y(), current.x() - anchor.x())
-        return [
-            QPointF(anchor.x() + r * math.cos(angle + i * math.pi / 3),
-                    anchor.y() + r * math.sin(angle + i * math.pi / 3))
-            for i in range(6)
-        ]
+    sides = 6
 
 
-class RegularPentagonTool(PresetShapeTool):
+class RegularPentagonTool(_RegularPolygonTool):
     name = "pentagon"
     shape_label = "Ngũ giác đều"
-
-    def compute_vertices(self, anchor, current):
-        r = _dist(anchor, current)
-        if r < 1:
-            return []
-        angle = math.atan2(current.y() - anchor.y(), current.x() - anchor.x())
-        return [
-            QPointF(anchor.x() + r * math.cos(angle + i * 2 * math.pi / 5),
-                    anchor.y() + r * math.sin(angle + i * 2 * math.pi / 5))
-            for i in range(5)
-        ]
+    sides = 5
 
 
 # Danh sách tất cả shape tools để đăng ký

@@ -32,7 +32,9 @@ sh.CurrentDirectory = root & "\geodraw"
 sh.Run found & " """ & mainPy & """", 0, True
 
 If fso.FileExists(logPath) Then
-    Set f = fso.OpenTextFile(logPath, 1, False, -2)
-    MsgBox f.ReadAll, vbExclamation, "GeoDraw - loi"
+    Set f = CreateObject("ADODB.Stream")    ' error_log.txt la UTF-8
+    f.Open : f.Type = 2 : f.Charset = "utf-8"
+    f.LoadFromFile logPath
+    MsgBox f.ReadText, vbExclamation, "GeoDraw - loi"
     f.Close
 End If

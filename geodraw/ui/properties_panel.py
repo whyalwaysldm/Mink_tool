@@ -181,7 +181,10 @@ class PropertiesPanel(QDockWidget):
         self._hide_btn.setText("👁  Hiện" if want_hidden else "👁  Ẩn")
 
     def _on_selection(self):
-        selected = self._scene.selectedItems()
+        try:
+            selected = self._scene.selectedItems()
+        except RuntimeError:
+            return    # scene đã bị hủy (đang đóng app)
         if not selected:
             # Khi không có gì được chọn, reset nút về trạng thái mặc định
             self._hide_btn.setChecked(False)

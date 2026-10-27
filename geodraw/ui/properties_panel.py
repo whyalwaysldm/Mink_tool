@@ -180,6 +180,18 @@ class PropertiesPanel(QDockWidget):
         # Cập nhật nhãn nút
         self._hide_btn.setText("👁  Hiện" if want_hidden else "👁  Ẩn")
 
+    def set_scene(self, scene):
+        """Gắn bảng thuộc tính với vùng vẽ của tab đang mở."""
+        if scene is self._scene:
+            return
+        try:
+            self._scene.selectionChanged.disconnect(self._on_selection)
+        except (TypeError, RuntimeError):
+            pass
+        self._scene = scene
+        scene.selectionChanged.connect(self._on_selection)
+        self._on_selection()
+
     def _on_selection(self):
         try:
             selected = self._scene.selectedItems()

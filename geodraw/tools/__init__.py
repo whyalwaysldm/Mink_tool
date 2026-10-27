@@ -116,6 +116,22 @@ class ToolManager(QObject):
         self._scene.set_tool(self._current_tool)
         self.tool_changed.emit(name)
 
+    def set_session(self, scene, history):
+        """Chuyển mọi công cụ sang phiên làm việc (tab) khác."""
+        self._current_tool.deactivate()
+        self._scene, self._history = scene, history
+        for tool in self._tools.values():
+            tool.scene, tool.history = scene, history
+        # Phép quay / vị tự hỏi tham số khi bật → không bật lại khi đổi tab
+        name = self._current_name
+        if name in ("rotate", "homothety"):
+            name = "select"
+        self._current_name = name
+        self._current_tool = self._tools[name]
+        self._current_tool.activate()
+        scene.set_tool(self._current_tool)
+        self.tool_changed.emit(name)
+
     def resolve_shortcut(self, key_str: str) -> str:
         return self._shortcuts.get(key_str, "")
 

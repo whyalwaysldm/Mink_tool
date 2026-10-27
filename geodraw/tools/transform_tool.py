@@ -25,8 +25,11 @@ from items.transform import (Transform, transform_items, SUPPORTED_HINT,
 
 _LINE_TYPES = (SegmentItem, LineItem, RayItem)
 
-# Đánh dấu dùng chung giữa các công cụ biến hình
-_marks = {"center": None, "axis": None}
+def _marks_for(scene) -> dict:
+    """Tâm / trục đánh dấu của một phiên (scene) — dùng chung giữa các công cụ biến hình."""
+    if not hasattr(scene, "transform_marks"):
+        scene.transform_marks = {"center": None, "axis": None}
+    return scene.transform_marks
 
 
 class _MarkOverlay:
@@ -40,8 +43,8 @@ class _MarkOverlay:
         self.hide()
         pen = QPen(QColor(230, 120, 0, 200), 2.5)
         pen.setCosmetic(True)
-        if kind == AXIS_REFLECT and _marks["axis"] is not None:
-            ax = _marks["axis"]
+        if kind == AXIS_REFLECT and _marks_for(scene)["axis"] is not None:
+            ax = _marks_for(scene)["axis"]
             a, b = ax.p1.scenePos(), ax.p2.scenePos()
             self._line = QGraphicsLineItem(a.x(), a.y(), b.x(), b.y())
             pen.setWidthF(5)
@@ -49,8 +52,8 @@ class _MarkOverlay:
             self._line.setPen(pen)
             self._line.setZValue(60)
             scene.addItem(self._line)
-        elif kind != AXIS_REFLECT and _marks["center"] is not None:
-            c = _marks["center"].scenePos()
+        elif kind != AXIS_REFLECT and _marks_for(scene)["center"] is not None:
+            c = _marks_for(scene)["center"].scenePos()
             self._ring = QGraphicsEllipseItem(-9, -9, 18, 18)
             self._ring.setPos(c)
             self._ring.setPen(pen)
@@ -68,12 +71,13 @@ class _MarkOverlay:
 _overlay = _MarkOverlay()
 
 
-def marked(key: str):
+def marked(scene, key: str):
     """Tâm ("center") / trục ("axis") đang đánh dấu, None nếu chưa có / đã xóa."""
-    it = _marks[key]
+    marks = _marks_for(scene)
+    it = marks[key]
     if it is not None and it.scene() is None:
-        _marks[key] = None
-    return _marks[key]
+        marks[key] = None
+    return marks[key]
 
 
 def add_mark_actions(menu, scene, history, pos: QPointF, hits: list,
@@ -83,7 +87,7 @@ def add_mark_actions(menu, scene, history, pos: QPointF, hits: list,
     on_change(msg) được gọi sau khi đánh dấu thay đổi.
     """
     def set_mark(key, item, msg):
-        _marks[key] = item
+        _marks_for(scene)[key] = item
         if on_change:
             on_change(msg)
 
@@ -112,10 +116,10 @@ def add_mark_actions(menu, scene, history, pos: QPointF, hits: list,
                                            "trục rồi click đối tượng"))
     if pt is None and line is None:
         menu.addAction("Tạo điểm tại đây làm tâm").triggered.connect(new_center)
-    if marked("center") is not None:
+    if marked(scene, "center") is not None:
         menu.addAction("Bỏ đánh dấu tâm").triggered.connect(
             lambda: set_mark("center", None, "Đã bỏ đánh dấu tâm"))
-    if marked("axis") is not None:
+    if marked(scene, "axis") is not None:
         menu.addAction("Bỏ đánh dấu trục").triggered.connect(
             lambda: set_mark("axis", None, "Đã bỏ đánh dấu trục"))
 
@@ -134,12 +138,12 @@ class _TransformTool(BaseTool):
 
     def _transform(self) -> Transform:
         if self.kind == AXIS_REFLECT:
-            ax = _marks["axis"]
+            ax = _marks_for(self.scene)["axis"]
             return Transform(AXIS_REFLECT, axis=(ax.p1, ax.p2))
-        return Transform(self.kind, center=_marks["center"])
+        return Transform(self.kind, center=_marks_for(self.scene)["center"])
 
     def _marked(self):
-        return marked("axis" if self.kind == AXIS_REFLECT else "center")
+        return marked(self.scene, "axis" if self.kind == AXIS_REFLECT else "center")
 
     # ── Lifecycle ─────────────────────────────────────────────────────
     def activate(self):
@@ -280,7 +284,7 @@ class RotateTool(_TransformTool):
         return ok
 
     def _transform(self) -> Transform:
-        return Transform(ROTATE, center=_marks["center"], angle=RotateTool.angle)
+        return Transform(ROTATE, center=_marks_for(self.scene)["center"], angle=RotateTool.angle)
 
 
 class HomothetyTool(_TransformTool):
@@ -299,4 +303,4 @@ class HomothetyTool(_TransformTool):
         return ok
 
     def _transform(self) -> Transform:
-        return Transform(HOMOTHETY, center=_marks["center"], ratio=HomothetyTool.ratio)
+        return Transform(HOMOTHETY, center=_marks_for(self.scene)["center"], ratio=HomothetyTool.ratio)

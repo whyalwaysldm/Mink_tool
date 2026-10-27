@@ -1,6 +1,6 @@
 from PyQt6.QtWidgets import (QMainWindow, QApplication, QStatusBar,
                               QMenuBar, QMenu, QToolBar, QToolButton,
-                              QButtonGroup, QLabel)
+                              QButtonGroup, QLabel, QTabWidget, QMessageBox)
 from PyQt6.QtGui import QKeyEvent, QAction, QFont
 from PyQt6.QtCore import Qt, QTimer, QSize
 
@@ -20,6 +20,15 @@ from export.file_export import save_png, save_svg, save_pdf
 from utils.tablet import EraserAutoSwitch
 
 
+class _Session:
+    """Một phiên làm việc (1 tab): vùng vẽ + lịch sử hoàn tác riêng."""
+
+    def __init__(self):
+        self.history = History()
+        self.scene = GeoScene(self.history)
+        self.view = None              # GeoView — tạo sau khi có ToolManager
+
+
 class MainWindow(QMainWindow):
 
     def __init__(self):
@@ -27,14 +36,21 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("GeoDraw — Vẽ hình học")
         self.resize(1200, 800)
 
-        self._history = History()
-        self._scene = GeoScene(self._history)
-        self._tm = ToolManager(self._scene, self._history)
-        self._scene.set_tool(self._tm.current_tool)
+        first = _Session()
+        self._tm = ToolManager(first.scene, first.history)
+        first.scene.set_tool(self._tm.current_tool)
         self._style_mgr = get_style_manager()
 
-        self._view = GeoView(self._scene, self._tm)
-        self.setCentralWidget(self._view)
+        # Mỗi tab là một phiên làm việc (Ctrl+N → phiên mới)
+        self._session_no = 0
+        self._tabs = QTabWidget()
+        self._tabs.setDocumentMode(True)
+        self._tabs.setTabsClosable(True)
+        self._tabs.setMovable(True)
+        self._tabs.tabCloseRequested.connect(self._close_session)
+        self._add_session(first)
+        self._tabs.currentChanged.connect(self._on_tab_changed)
+        self.setCentralWidget(self._tabs)
 
         # Toolbar công cụ (trái)
         self._toolbar = ToolBar(self._tm, self)
@@ -45,7 +61,7 @@ class MainWindow(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, self._style_bar)
 
         # Properties dock
-        self._props = PropertiesPanel(self._scene, self._tm, self)
+        self._props = PropertiesPanel(first.scene, self._tm, self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._props)
 
         # Status bar
@@ -68,11 +84,73 @@ class MainWindow(QMainWindow):
         # Sau khi cửa sổ hiển thị: áp dụng zoom theo cài đặt
         QTimer.singleShot(80, self._apply_initial_zoom)
 
+    # ── Phiên làm việc (tab) ────────────────────────────────────────────
+
+    def _session(self) -> _Session:
+        return self._tabs.currentWidget()._session
+
+    @property
+    def _scene(self):
+        return self._session().scene
+
+    @property
+    def _history(self):
+        return self._session().history
+
+    @property
+    def _view(self):
+        return self._session().view
+
+    def _add_session(self, sess: _Session) -> int:
+        sess.view = GeoView(sess.scene, self._tm)
+        sess.view._session = sess
+        self._session_no += 1
+        return self._tabs.addTab(sess.view, f"Phiên {self._session_no}")
+
+    def _new_session(self):
+        """Ctrl+N: mở phiên làm việc mới trong tab mới, phiên cũ giữ nguyên."""
+        idx = self._add_session(_Session())
+        self._tabs.setCurrentIndex(idx)
+        QTimer.singleShot(0, self._apply_initial_zoom)
+        self.statusBar().showMessage(
+            f"✓ Đã mở {self._tabs.tabText(idx)} — các phiên cũ vẫn ở các tab trước",
+            3000)
+
+    def _on_tab_changed(self, idx: int):
+        if idx < 0:
+            return
+        sess = self._tabs.widget(idx)._session
+        self._tm.set_session(sess.scene, sess.history)
+        self._props.set_scene(sess.scene)
+
+    def _close_session(self, idx: int):
+        if self._tabs.count() <= 1:
+            self.statusBar().showMessage("Không thể đóng phiên cuối cùng", 2500)
+            return
+        view = self._tabs.widget(idx)
+        from items.base import GeoItem
+        if any(isinstance(it, GeoItem) for it in view._session.scene.items()):
+            ans = QMessageBox.question(
+                self, "Đóng phiên",
+                f"Đóng {self._tabs.tabText(idx)}? Hình vẽ trong phiên này sẽ mất.")
+            if ans != QMessageBox.StandardButton.Yes:
+                return
+        self._tabs.removeTab(idx)     # → currentChanged sang tab khác
+        view._session.history.stack.clear()
+        view.deleteLater()
+        view._session.scene.deleteLater()
+
     def _build_menu(self):
         mb = self.menuBar()
 
         # File
         file_menu = mb.addMenu("Tệp")
+        act_new = QAction("Phiên làm việc mới (Ctrl+N)", self)
+        act_new.setShortcut("Ctrl+N")
+        act_new.triggered.connect(self._new_session)
+        file_menu.addAction(act_new)
+        file_menu.addSeparator()
+
         act_png = QAction("Lưu PNG (Ctrl+S)", self)
         act_png.setShortcut("Ctrl+S")
         act_png.triggered.connect(lambda: save_png(self._scene, self))
@@ -97,12 +175,12 @@ class MainWindow(QMainWindow):
         edit_menu = mb.addMenu("Sửa")
         act_undo = QAction("Hoàn tác (Ctrl+Z)", self)
         act_undo.setShortcut("Ctrl+Z")
-        act_undo.triggered.connect(self._history.undo)
+        act_undo.triggered.connect(lambda: self._history.undo())
         edit_menu.addAction(act_undo)
 
         act_redo = QAction("Làm lại (Ctrl+Y)", self)
         act_redo.setShortcut("Ctrl+Y")
-        act_redo.triggered.connect(self._history.redo)
+        act_redo.triggered.connect(lambda: self._history.redo())
         edit_menu.addAction(act_redo)
 
         edit_menu.addSeparator()
@@ -129,17 +207,17 @@ class MainWindow(QMainWindow):
         view_menu = mb.addMenu("Xem")
         act_zi = QAction("Phóng to (Ctrl+=)", self)
         act_zi.setShortcut("Ctrl+=")
-        act_zi.triggered.connect(self._view.zoom_in)
+        act_zi.triggered.connect(lambda: self._view.zoom_in())
         view_menu.addAction(act_zi)
 
         act_zo = QAction("Thu nhỏ (Ctrl+-)", self)
         act_zo.setShortcut("Ctrl+-")
-        act_zo.triggered.connect(self._view.zoom_out)
+        act_zo.triggered.connect(lambda: self._view.zoom_out())
         view_menu.addAction(act_zo)
 
         act_zf = QAction("Vừa màn hình (Ctrl+0)", self)
         act_zf.setShortcut("Ctrl+0")
-        act_zf.triggered.connect(self._view.zoom_fit)
+        act_zf.triggered.connect(lambda: self._view.zoom_fit())
         view_menu.addAction(act_zf)
 
         view_menu.addSeparator()

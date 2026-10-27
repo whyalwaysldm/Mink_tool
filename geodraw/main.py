@@ -44,6 +44,8 @@ def main():
 
 def _close_terminal():
     """Đóng cửa sổ terminal đang chạy script này."""
+    if sys.stdout is None:
+        return    # chạy bằng pythonw — không có terminal để đóng
     try:
         import platform, subprocess
         if platform.system() == "Windows":

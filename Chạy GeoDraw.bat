@@ -41,6 +41,15 @@ if errorlevel 1 (
 
 if exist "%ROOT%error_log.txt" del "%ROOT%error_log.txt"
 
+rem --- Chay bang pythonw (khong co cua so cmd); cmd nay dong ngay ---
+set "PYW="
+for /f "delims=" %%I in ('%PY% -c "import sys,os;print(os.path.join(os.path.dirname(sys.executable),'pythonw.exe'))"') do set "PYW=%%I"
+if defined PYW if exist "%PYW%" (
+    start "" "%PYW%" main.py
+    exit /b 0
+)
+
+rem --- Khong co pythonw: chay trong cua so nay nhu cu ---
 %PY% -u -W all main.py
 set "CODE=%errorlevel%"
 echo.

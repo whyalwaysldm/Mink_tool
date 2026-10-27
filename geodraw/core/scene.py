@@ -173,6 +173,14 @@ class GeoScene(QGraphicsScene):
         đi theo khi đường di chuyển); ngược lại → điểm tự do.
         """
         r = self.snap_info(pos)
+        if r.snap_type == "intersection" and r.host2 is not None:
+            from items.on_curve import IntersectionPointItem, anchor_points
+            h2, k2 = r.host2
+            anchors = anchor_points(self, r.host)
+            anchors += [p for p in anchor_points(self, h2) if p not in anchors]
+            if anchors:
+                return IntersectionPointItem(r.host, r.host_idx, h2, k2,
+                                             r.pos, anchors, color)
         if r.snap_type == "on_curve" and r.host is not None:
             from items.on_curve import PointOnCurveItem, anchor_points
             anchors = anchor_points(self, r.host)

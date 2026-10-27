@@ -26,16 +26,19 @@ class SnapResult:
     snap_type  – "point" | "intersection" | "on_curve" | "free"
     host       – (chỉ với "on_curve") đối tượng chứa điểm snap
     host_idx   – chỉ số curve trong curves_of(host) (cạnh đa giác…)
+    host2      – (chỉ với "intersection") (đối tượng thứ hai, chỉ số curve);
+                 khi đó host / host_idx là đối tượng thứ nhất
     """
-    __slots__ = ("item", "pos", "snap_type", "host", "host_idx")
+    __slots__ = ("item", "pos", "snap_type", "host", "host_idx", "host2")
 
     def __init__(self, item, pos: QPointF, snap_type: str,
-                 host=None, host_idx: int = 0):
+                 host=None, host_idx: int = 0, host2=None):
         self.item      = item
         self.pos       = pos
         self.snap_type = snap_type
         self.host      = host
         self.host_idx  = host_idx
+        self.host2     = host2
 
 
 # ── Hàm chính ────────────────────────────────────────────────────────────────
@@ -64,6 +67,7 @@ def snap(pos: QPointF, scene, exclude=None) -> SnapResult:
 
     # ── 2. Giao điểm của các đường đã vẽ ────────────────────────────────
     best_ipt = None
+    best_ij  = (0, 0)
     best_d   = SNAP_RADIUS
     n = len(curves)
     for i in range(n):
@@ -73,8 +77,11 @@ def snap(pos: QPointF, scene, exclude=None) -> SnapResult:
                 if d < best_d:
                     best_d   = d
                     best_ipt = pt
+                    best_ij  = (i, j)
     if best_ipt is not None:
-        return SnapResult(None, best_ipt, "intersection")
+        i, j = best_ij
+        return SnapResult(None, best_ipt, "intersection",
+                          *hosts[i], host2=hosts[j])
 
     # ── 3. Điểm gần nhất trên đường / đoạn / tia / đường tròn ──────────
     best_foot = None
@@ -217,6 +224,14 @@ def _add_poly_edges(curves: list, pts: list, closed: bool):
 
 
 # ── Tính giao điểm giữa 2 đường ──────────────────────────────────────────────
+
+def intersect_curves(c1: tuple, c2: tuple, extend: bool = False) -> list:
+    """Giao điểm của 2 curve. extend=True → coi đoạn / tia là đường thẳng."""
+    if extend:
+        c1 = ('line',) + c1[1:] if c1[0] in ('segment', 'ray') else c1
+        c2 = ('line',) + c2[1:] if c2[0] in ('segment', 'ray') else c2
+    return _intersect(c1, c2)
+
 
 def _intersect(c1: tuple, c2: tuple) -> list:
     t1, d1a, d1b = c1

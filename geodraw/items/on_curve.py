@@ -105,3 +105,62 @@ class PointOnCurveItem(PointItem):
     def remove_from_scene(self):
         for p in self._anchors:
             p.remove_dependent(self)
+
+
+class IntersectionPointItem(PointItem):
+    """
+    Giao điểm của 2 đường (curve k1 của host1, curve k2 của host2).
+    Không kéo trực tiếp được; tự cập nhật khi một trong hai đường di chuyển.
+    Đường tròn cắt đường cho 2 giao điểm → giữ giao điểm gần vị trí cũ nhất.
+    Giao điểm ra ngoài đoạn / tia → vẫn bám theo phần kéo dài của chúng.
+    """
+    is_constrained = True
+
+    def __init__(self, host1, k1: int, host2, k2: int, pos: QPointF,
+                 anchors: list, color=None):
+        self._updating = False
+        self._hosts = ((host1, k1), (host2, k2))
+        self._anchors = list(anchors)
+        super().__init__(pos, color)
+        for p in self._anchors:
+            p.add_dependent(self)
+        self.update_position()
+
+    def _compute_pos(self):
+        from utils.snap_engine import curves_of, intersect_curves
+        cs = []
+        for host, k in self._hosts:
+            if host.scene() is None:
+                return None
+            curves = curves_of(host)
+            if k >= len(curves):
+                return None
+            cs.append(curves[k])
+        pts = intersect_curves(cs[0], cs[1]) or \
+            intersect_curves(cs[0], cs[1], extend=True)
+        if not pts:
+            return None               # 2 đường không còn cắt nhau → giữ chỗ cũ
+        cur = self.scenePos()
+        return min(pts, key=lambda q: (q.x() - cur.x()) ** 2 + (q.y() - cur.y()) ** 2)
+
+    def update_position(self):
+        pos = self._compute_pos()
+        if pos is None:
+            return
+        self._updating = True
+        self.setPos(pos)
+        self._updating = False
+
+    def itemChange(self, change, value):
+        if (change == QGraphicsItem.GraphicsItemChange.ItemPositionChange
+                and not self._updating):
+            return self.pos()
+        if change == QGraphicsItem.GraphicsItemChange.ItemSceneHasChanged \
+                and self.scene() is not None:
+            for p in self._anchors:
+                p.add_dependent(self)     # khôi phục sau undo xóa
+        return super().itemChange(change, value)
+
+    def remove_from_scene(self):
+        for p in self._anchors:
+            p.remove_dependent(self)

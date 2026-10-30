@@ -2,12 +2,15 @@ from PyQt6.QtCore import Qt, QPointF
 from PyQt6.QtWidgets import QInputDialog
 from .base_tool import BaseTool
 from items.point import PointItem
-from items.point_label import PointLabelItem
+from items.point_label import (PointLabelItem, nameable_line_at,
+                               line_name_label, next_line_name, make_line_name)
 
 
 class RenamePointTool(BaseTool):
     """
-    Click vào điểm → đặt / đổi tên.
+    Click vào điểm → đặt / đổi tên điểm.
+    Click vào đường thẳng / tia → đặt / đổi tên đường (d, d1…), nhãn đặt
+    gần chỗ click và đi theo đường.
     Tên được lưu trong PointLabelItem (kéo được) thay vì vẽ cố định trên điểm.
     """
     name = "rename_point"
@@ -15,7 +18,7 @@ class RenamePointTool(BaseTool):
 
     def activate(self):
         self.tm.status_hint.emit(
-            "Đặt tên điểm: click vào điểm cần đặt / đổi tên")
+            "Đặt tên: click vào điểm, đường thẳng hoặc tia cần đặt / đổi tên")
 
     # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -34,6 +37,12 @@ class RenamePointTool(BaseTool):
                 return it
         return None
 
+    def _ask(self, title: str, prompt: str, suggestion: str):
+        parent_widget = self.scene.views()[0] if self.scene.views() else None
+        text, ok = QInputDialog.getText(parent_widget, title, prompt,
+                                        text=suggestion)
+        return text.strip() if ok else None
+
     # ── Event ─────────────────────────────────────────────────────────────
 
     def press(self, pos: QPointF, button, modifiers):
@@ -42,26 +51,21 @@ class RenamePointTool(BaseTool):
 
         snapped_item, _ = self.scene.snap(pos)
         if not isinstance(snapped_item, PointItem):
+            line = nameable_line_at(self.scene, pos)
+            if line is not None:
+                self._rename_line(line, pos)
+                return
             self.tm.status_hint.emit(
-                "Đặt tên điểm: hãy click đúng vào một điểm")
+                "Đặt tên: hãy click đúng vào một điểm, đường thẳng hoặc tia")
             return
 
         point = snapped_item
         existing = self._label_item_of(point)
 
-        # Mở dialog
-        parent_widget = self.scene.views()[0] if self.scene.views() else None
-        suggestion = point.label or self._next_label()
-        text, ok = QInputDialog.getText(
-            parent_widget,
-            "Đặt tên điểm",
-            "Nhập tên điểm (bỏ trống để xóa nhãn):",
-            text=suggestion,
-        )
-        if not ok:
+        name = self._ask("Đặt tên điểm", "Nhập tên điểm (bỏ trống để xóa nhãn):",
+                         point.label or self._next_label())
+        if name is None:
             return
-
-        name = text.strip()
 
         # ── Xóa nhãn ──────────────────────────────────────────────────
         if not name:
@@ -84,3 +88,23 @@ class RenamePointTool(BaseTool):
         self.history.push_add(self.scene, label_item)
         self.tm.status_hint.emit(
             f"✓ Đặt tên điểm: '{name}'  (kéo nhãn để di chuyển)")
+
+    def _rename_line(self, line, pos: QPointF):
+        existing = line_name_label(self.scene, line)
+        name = self._ask("Đặt tên đường", "Nhập tên đường (bỏ trống để xóa tên):",
+                         existing.text if existing else next_line_name(self.scene))
+        if name is None:
+            return
+        if not name:
+            if existing is not None:
+                self.history.push_remove(self.scene, [existing, existing._point])
+            self.tm.status_hint.emit("✓ Đã xóa tên đường")
+            return
+        if existing is not None:
+            existing.text = name
+            self.tm.status_hint.emit(f"✓ Đổi tên đường thành '{name}'")
+            return
+        items = make_line_name(self.scene, line, pos, name)
+        self.history.push_add_batch(self.scene, items)
+        self.tm.status_hint.emit(
+            f"✓ Đặt tên đường: '{name}'  (kéo nhãn để di chuyển)")

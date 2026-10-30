@@ -86,7 +86,7 @@ def edit_label(item, scene, history) -> bool:
     old = item.style_state()
     text, family, size = old
     dlg = LabelDialog(_view_of(scene), "Sửa nhãn", text, family, size,
-                      italic=not isinstance(item, LabelItem))
+                      italic=True)
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return False
     new_text, new_family, new_size = dlg.values()

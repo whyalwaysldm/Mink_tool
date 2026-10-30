@@ -181,3 +181,84 @@ class PointLabelItem(GeoItem):
         painter.setPen(QPen(color, 1.0))
         # drawText với baseline tại (0, 0)
         painter.drawText(QPointF(0, 0), self._text)
+
+
+# ── Tên cho đường thẳng / tia ────────────────────────────────────────────────
+# Tên đường dùng lại PointLabelItem, gắn vào một điểm neo ẩn nằm trên đường
+# (PointOnCurveItem) → nhãn đi theo khi đường di chuyển, kéo được quanh điểm neo.
+
+NAMEABLE_LINE_HINT = "đường thẳng / tia"
+
+
+def nameable_line_at(scene, pos: QPointF, max_dist: float = 8.0):
+    """Đường thẳng / tia gần pos nhất (trong max_dist px), hoặc None."""
+    from items.line import LineItem, RayItem
+    from utils.snap_engine import curves_of
+    from items.on_curve import _param_of, _pos_of
+    best, best_d = None, max_dist
+    for it in scene.items():
+        if not isinstance(it, (LineItem, RayItem)) or not it.isVisible():
+            continue
+        for c in curves_of(it):
+            foot = _pos_of(c, _param_of(c, pos))
+            d = math.hypot(foot.x() - pos.x(), foot.y() - pos.y())
+            if d < best_d:
+                best, best_d = it, d
+    return best
+
+
+def line_name_label(scene, line):
+    """PointLabelItem đang làm tên cho line, hoặc None."""
+    for it in scene.items():
+        if isinstance(it, PointLabelItem) and \
+                getattr(it._point, 'host', None) is line:
+            return it
+    return None
+
+
+def line_names_used(scene) -> set:
+    from items.on_curve import PointOnCurveItem
+    return {it.label for it in scene.items()
+            if isinstance(it, PointOnCurveItem) and not it.isVisible()
+            and it.label}
+
+
+def next_line_name(scene) -> str:
+    """d, d1, d2… — tên đường chưa dùng."""
+    used = line_names_used(scene)
+    n = 0
+    while ("d" + (str(n) if n else "")) in used:
+        n += 1
+    return "d" + (str(n) if n else "")
+
+
+def make_line_name(scene, line, pos: QPointF, name: str) -> list:
+    """
+    Tạo [điểm neo ẩn, nhãn] đặt tên cho line tại chỗ gần pos nhất trên đường.
+    Chưa addItem — gọi history.push_add_batch(scene, items).
+    """
+    from utils.snap_engine import curves_of
+    from items.on_curve import PointOnCurveItem, anchor_points, _param_of, _pos_of
+    c = curves_of(line)[0]
+    foot = _pos_of(c, _param_of(c, pos))
+    anchor = PointOnCurveItem(line, 0, foot, anchor_points(scene, line))
+    anchor.setVisible(False)
+    anchor.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+    anchor.label = name
+    # Nhãn lệch về phía chỗ click (bên nào của đường)
+    dx, dy = pos.x() - foot.x(), pos.y() - foot.y()
+    d = math.hypot(dx, dy)
+    off = QPointF(dx / d * 14, dy / d * 14 + 5) if d > 2 else QPointF(9, -11)
+    return [anchor, PointLabelItem(anchor, name, off)]
+
+
+def with_line_names(scene, items: list) -> list:
+    """Xóa đường / tia → xóa luôn tên của nó (nhãn + điểm neo)."""
+    result = list(items)
+    for it in items:
+        lbl = line_name_label(scene, it)
+        if lbl is not None:
+            for extra in (lbl, lbl._point):
+                if extra not in result:
+                    result.append(extra)
+    return result

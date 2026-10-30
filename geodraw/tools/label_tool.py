@@ -1,7 +1,8 @@
 from PyQt6.QtCore import Qt, QPointF
 from .base_tool import BaseTool
 from items.label import LabelItem
-from items.point_label import PointLabelItem
+from items.point_label import (PointLabelItem, nameable_line_at,
+                               line_name_label, next_line_name, make_line_name)
 
 # px manhattan — ngưỡng để tính là kéo thật (lọc rung bút)
 _DRAG_THRESHOLD = 4.0
@@ -123,6 +124,18 @@ class LabelTool(BaseTool):
                 return
             point.label = name
             item = PointLabelItem(point, name)
+        elif (line := nameable_line_at(self.scene, pos, 6.0)) is not None:
+            # Click vào đường thẳng / tia → đặt tên đường (d, d1…)
+            if line_name_label(self.scene, line) is not None:
+                self.tm.status_hint.emit(
+                    "Đường đã có tên — double-click nhãn để đổi")
+                return
+            name = next_line_name(self.scene)
+            self.history.push_add_batch(
+                self.scene, make_line_name(self.scene, line, pos, name))
+            self.tm.status_hint.emit(
+                f"✓ Đã đặt tên đường '{name}'  —  double-click để đổi tên")
+            return
         else:
             item = LabelItem(name, pos)
         self.scene.addItem(item)

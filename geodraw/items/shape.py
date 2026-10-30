@@ -275,8 +275,12 @@ def shape_of(item):
 
 
 def expand_for_delete(items: list) -> list:
-    """Xóa cả hình mẫu → xóa luôn cạnh và đỉnh không còn dùng ở chỗ khác."""
+    """Xóa cả hình mẫu → xóa luôn cạnh và đỉnh không còn dùng ở chỗ khác;
+    xóa đường / tia → xóa luôn tên của nó."""
     result = list(items)
+    if items and items[0].scene() is not None:
+        from items.point_label import with_line_names
+        result = with_line_names(items[0].scene(), result)
     for it in items:
         if not isinstance(it, ShapeItem):
             continue

@@ -50,7 +50,9 @@ class LabelItem(GeoItem):
 
     def _apply_font(self):
         self.prepareGeometryChange()
-        self._text_item.setFont(QFont(self._font_family, self._font_size))
+        f = QFont(self._font_family, self._font_size)
+        f.setItalic(True)           # tên / nhãn luôn in nghiêng
+        self._text_item.setFont(f)
 
     def style_state(self) -> tuple:
         """(text, family, size) — dùng cho undo/redo."""

@@ -33,7 +33,9 @@ class EraseTool(BaseTool):
 
     def _commit(self):
         if self._erased:
-            self.history.push_remove(self.scene, list(self._erased))
+            from items.point_label import with_line_names
+            self.history.push_remove(
+                self.scene, with_line_names(self.scene, list(self._erased)))
         self._erased = []
         self._erasing = False
 

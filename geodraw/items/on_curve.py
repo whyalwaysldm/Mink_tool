@@ -73,8 +73,8 @@ class PointOnCurveItem(PointItem):
         return self._host
 
     def _curve(self):
-        if self._host.scene() is None:
-            return None               # đường đã bị xóa → điểm thành tự do
+        # Đường đã bị xóa (đường phụ) vẫn tính theo các điểm của nó → điểm
+        # vẫn giữ đúng tính chất dựng hình
         from utils.snap_engine import curves_of
         curves = curves_of(self._host)
         return curves[self._index] if self._index < len(curves) else None
@@ -131,8 +131,8 @@ class IntersectionPointItem(PointItem):
         from utils.snap_engine import curves_of, intersect_curves
         cs = []
         for host, k in self._hosts:
-            if host.scene() is None:
-                return None
+            # host bị xóa (đường phụ đã dựng xong) vẫn dùng được: hình học của
+            # nó chỉ phụ thuộc các điểm, nên giao điểm vẫn đúng khi kéo hình
             curves = curves_of(host)
             if k >= len(curves):
                 return None

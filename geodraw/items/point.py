@@ -33,7 +33,11 @@ class PointItem(GeoItem):
             self._dependents.remove(item)
 
     def itemChange(self, change, value):
-        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange:
+            # Báo trước cho Qt vùng cũ của các đối tượng phụ thuộc (cần vẽ lại)
+            for dep in self._dependents:
+                dep.prepareGeometryChange()
+        elif change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
             for dep in self._dependents:
                 # Constrained points (MidpointItem, CircumcenterItem…) reposition first
                 if hasattr(dep, 'update_position'):

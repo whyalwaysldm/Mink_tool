@@ -84,8 +84,11 @@ class GeoView(QGraphicsView):
         super().__init__(scene, parent)
         self._tm = tool_manager
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        # Vẽ lại toàn bộ khung nhìn mỗi lần thay đổi: các đường dài (đường thẳng,
+        # tia) đổi hình theo điểm nên vẽ lại từng vùng nhỏ dễ để sót vệt cũ
+        # (đường đã xóa vẫn hiện, cuộn trang thì hiện lại)
         self.setViewportUpdateMode(
-            QGraphicsView.ViewportUpdateMode.SmartViewportUpdate)
+            QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setTransformationAnchor(
             QGraphicsView.ViewportAnchor.AnchorUnderMouse)

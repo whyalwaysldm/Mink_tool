@@ -2,19 +2,48 @@ from PyQt6.QtGui import QUndoStack, QUndoCommand
 from PyQt6.QtWidgets import QGraphicsScene
 
 
+def _dep_points(scene, items: list) -> dict:
+    """item → các PointItem đang có item trong _dependents (ghi lại trước khi gỡ)."""
+    from items.point import PointItem
+    pts = [p for p in scene.items() if isinstance(p, PointItem)]
+    pts += [p for p in items if isinstance(p, PointItem) and p not in pts]
+    return {it: [p for p in pts if it in p._dependents] for it in items}
+
+
+def _detach(scene, items: list) -> dict:
+    """Gỡ items khỏi scene; trả về liên kết phụ thuộc để gắn lại khi hoàn tác."""
+    deps = _dep_points(scene, items)
+    for item in items:
+        scene.removeItem(item)
+        if hasattr(item, 'remove_from_scene'):
+            item.remove_from_scene()
+    return deps
+
+
+def _attach(scene, items: list, deps: dict):
+    """Thêm lại items và khôi phục liên kết phụ thuộc (đường tròn, trung điểm…
+    tiếp tục đi theo điểm của nó sau khi hoàn tác)."""
+    for item in items:
+        scene.addItem(item)
+    for item in items:
+        for p in deps.get(item, ()):
+            p.add_dependent(item)
+        if hasattr(item, 'update_position'):
+            item.update_position()
+
+
 class _AddCmd(QUndoCommand):
     def __init__(self, scene: QGraphicsScene, item):
         super().__init__("Add item")
         self.scene = scene
         self.item = item
+        self.deps: dict = {}
 
     def redo(self):
-        self.scene.addItem(self.item)
+        _attach(self.scene, [self.item], self.deps)
 
     def undo(self):
-        self.scene.removeItem(self.item)
-        if hasattr(self.item, 'remove_from_scene'):
-            self.item.remove_from_scene()
+        self.deps = _detach(self.scene, [self.item])
 
 
 class _RemoveCmd(QUndoCommand):
@@ -22,16 +51,13 @@ class _RemoveCmd(QUndoCommand):
         super().__init__("Remove items")
         self.scene = scene
         self.items = list(items)
+        self.deps: dict = {}
 
     def redo(self):
-        for item in self.items:
-            self.scene.removeItem(item)
-            if hasattr(item, 'remove_from_scene'):
-                item.remove_from_scene()
+        self.deps = _detach(self.scene, self.items)
 
     def undo(self):
-        for item in self.items:
-            self.scene.addItem(item)
+        _attach(self.scene, self.items, self.deps)
 
 
 class _VisibilityCmd(QUndoCommand):

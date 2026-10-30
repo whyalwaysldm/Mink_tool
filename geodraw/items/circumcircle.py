@@ -1,8 +1,8 @@
 import math
 from PyQt6.QtWidgets import QGraphicsItem
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor
+from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath
 from PyQt6.QtCore import QRectF, QPointF, Qt
-from .base import GeoItem
+from .base import GeoItem, stroke_shape
 from .point import PointItem
 
 
@@ -86,6 +86,13 @@ class CircumcircleItem(GeoItem):
         lc = self.mapFromScene(center)
         pad = r + self.stroke_width + 4
         return QRectF(lc.x() - pad, lc.y() - pad, pad * 2, pad * 2)
+
+    def shape(self):
+        center, r = self._data()
+        path = QPainterPath()
+        if center is not None:
+            path.addEllipse(self.mapFromScene(center), r, r)
+        return stroke_shape(path)
 
     def paint(self, painter: QPainter, option, widget=None):
         center, r = self._data()

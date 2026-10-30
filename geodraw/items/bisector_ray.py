@@ -1,7 +1,7 @@
 import math
-from PyQt6.QtGui import QPainter, QPen, QColor
+from PyQt6.QtGui import QPainter, QPen, QColor, QPainterPath
 from PyQt6.QtCore import QRectF, QPointF, Qt
-from .base import GeoItem
+from .base import GeoItem, stroke_shape
 from .point import PointItem
 
 EXTEND = 5000.0
@@ -59,6 +59,12 @@ class BisectorRayItem(GeoItem):
             max(abs(a.x() - b.x()) + pad * 2, 1),
             max(abs(a.y() - b.y()) + pad * 2, 1),
         )
+
+    def shape(self):
+        a, b = self._endpoints()
+        path = QPainterPath(a)
+        path.lineTo(b)
+        return stroke_shape(path)
 
     def paint(self, painter: QPainter, option, widget=None):
         a, b = self._endpoints()

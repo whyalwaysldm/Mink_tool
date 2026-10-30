@@ -1,7 +1,14 @@
 from abc import abstractmethod
 from PyQt6.QtWidgets import QGraphicsItem
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QPainterPath, QPainterPathStroker
 from PyQt6.QtCore import Qt
+
+
+def stroke_shape(path: QPainterPath, width: float = 10.0) -> QPainterPath:
+    """Vùng click là dải mỏng dọc theo nét (không phải cả khung bao)."""
+    stroker = QPainterPathStroker()
+    stroker.setWidth(width)
+    return stroker.createStroke(path)
 
 
 class GeoItem(QGraphicsItem):

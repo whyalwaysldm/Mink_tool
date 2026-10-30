@@ -1,7 +1,7 @@
 import math
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor
+from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath
 from PyQt6.QtCore import QRectF, QPointF, Qt
-from .base import GeoItem
+from .base import GeoItem, stroke_shape
 from .point import PointItem
 
 
@@ -35,6 +35,11 @@ class CircleItem(GeoItem):
         lc = self._local_center()
         r = self._radius() + self.stroke_width + 4
         return QRectF(lc.x() - r, lc.y() - r, r * 2, r * 2)
+
+    def shape(self):
+        path = QPainterPath()
+        path.addEllipse(self._local_center(), self._radius(), self._radius())
+        return stroke_shape(path)
 
     def paint(self, painter: QPainter, option, widget=None):
         lc = self._local_center()

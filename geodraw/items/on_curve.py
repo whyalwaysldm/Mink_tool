@@ -118,10 +118,11 @@ class IntersectionPointItem(PointItem):
 
     def __init__(self, host1, k1: int, host2, k2: int, pos: QPointF,
                  anchors: list, color=None):
-        self._updating = False
+        self._updating = True         # cho phép đặt vị trí ban đầu = pos
         self._hosts = ((host1, k1), (host2, k2))
         self._anchors = list(anchors)
         super().__init__(pos, color)
+        self._updating = False
         for p in self._anchors:
             p.add_dependent(self)
         self.update_position()

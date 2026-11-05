@@ -77,6 +77,10 @@ class SelectTool(BaseTool):
     def _sort_key(item):
         from items.point import PointItem
         from items.segment import SegmentItem
+        from items.point_label import PointLabelItem
+        from items.label import LabelItem
+        if isinstance(item, (PointLabelItem, LabelItem)):
+            return (-1, 0.0, 0.0, 0.0)     # click trúng chữ → kéo nhãn
         if isinstance(item, PointItem):
             sp = item.scenePos()
             # Điểm kéo được trước điểm dựng hình trùng chỗ (chân đường cao…)

@@ -2,7 +2,8 @@
 PointLabelItem — nhãn chữ gắn với một PointItem.
 
 • Hiển thị tên điểm bằng font toán (Times New Roman italic).
-• Có thể kéo bằng SelectTool nhưng bị giữ trong vòng MAX_DIST px quanh điểm.
+• Tự đặt ở phía "bên ngoài" hình (ngược hướng các đường đi qua điểm).
+• Kéo tự do bằng SelectTool / công cụ Nhãn, giữ trong vòng MAX_DIST px quanh điểm.
 • Khi điểm di chuyển, nhãn theo cùng (giữ nguyên offset).
 • Kéo điểm + nhãn cùng lúc → nhãn không bị constraint (offset giữ nguyên).
 """
@@ -14,7 +15,9 @@ from PyQt6.QtCore import QRectF, QPointF, Qt
 from .base import GeoItem
 from .point import PointItem
 
-MAX_DIST = 52.0   # px — xa nhất nhãn có thể cách tâm điểm
+MAX_DIST = 160.0  # px — xa nhất nhãn có thể cách tâm điểm
+DEFAULT_FONT_SIZE = 9   # cỡ chữ tên điểm / tên đường
+LABEL_GAP = 11.0  # px — khoảng cách từ điểm tới tâm chữ khi tự đặt
 MIN_DIST =  7.0   # px — gần nhất (tránh đè lên dot điểm)
 
 
@@ -25,11 +28,12 @@ class PointLabelItem(GeoItem):
         super().__init__()
         self._point = point
         self._text  = text
-        # offset: vector từ scenePos(point) → scenePos(label-baseline-left)
-        self._offset = QPointF(offset) if offset else QPointF(9, -11)
         self._moving_by_point = False   # guard: programmatic move
         self._font_family = "Times New Roman"
-        self._font_size   = 13
+        self._font_size   = DEFAULT_FONT_SIZE
+        # offset: vector từ scenePos(point) → scenePos(label-baseline-left)
+        self._offset = QPointF(offset) if offset is not None \
+            else self._offset_towards(_outward_dir(point))
 
         # Không dùng ItemIsMovable vì SelectTool dùng setPos() trực tiếp.
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable,         True)
@@ -77,6 +81,15 @@ class PointLabelItem(GeoItem):
     def _max_dist(self) -> float:
         # Chữ to thì cho phép đặt nhãn xa điểm hơn
         return MAX_DIST * max(1.0, self._font_size / 13.0)
+
+    def _offset_towards(self, d: tuple) -> QPointF:
+        """Offset (baseline-trái) để tâm chữ nằm cách điểm LABEL_GAP theo hướng d."""
+        fm = QFontMetricsF(self._font())
+        w, asc = fm.horizontalAdvance(self._text or "A"), fm.ascent()
+        # Lùi thêm theo kích thước chữ để chữ không đè lên điểm / đường
+        gap = LABEL_GAP + abs(d[0]) * w / 2 + abs(d[1]) * asc * 0.35
+        cx, cy = d[0] * gap, d[1] * gap
+        return QPointF(cx - w / 2, cy + asc * 0.35)
 
     # ── Sync với điểm cha ────────────────────────────────────────────────
 
@@ -183,6 +196,94 @@ class PointLabelItem(GeoItem):
         painter.drawText(QPointF(0, 0), self._text)
 
 
+# ── Tự chọn hướng đặt nhãn ───────────────────────────────────────────────────
+
+def _unit(dx: float, dy: float):
+    L = math.hypot(dx, dy)
+    return (dx / L, dy / L) if L > 1e-9 else None
+
+
+def _figure_centroid(scene, skip):
+    pts = [p.scenePos() for p in scene.point_items() if p is not skip] \
+        if scene is not None else []
+    if not pts:
+        return None
+    return (sum(p.x() for p in pts) / len(pts), sum(p.y() for p in pts) / len(pts))
+
+
+def _busy_dirs(point) -> list:
+    """Các hướng (vector đơn vị) từ điểm theo những đường / điểm nối với nó."""
+    from items.on_curve import PointOnCurveItem, IntersectionPointItem
+    from items.line import LineItem
+    from utils.snap_engine import curves_of
+    p = point.scenePos()
+    dirs = []
+
+    def towards(q, both=False):
+        u = _unit(q.x() - p.x(), q.y() - p.y())
+        if u:
+            dirs.append(u)
+            if both:
+                dirs.append((-u[0], -u[1]))
+
+    def along(curve):
+        if curve[0] == 'circle':
+            c = curve[1]
+            u = _unit(p.x() - c.x(), p.y() - c.y())
+            if u:                       # tiếp tuyến tại điểm + hướng vào tâm
+                dirs.extend([(-u[1], u[0]), (u[1], -u[0]), (-u[0], -u[1])])
+        else:
+            a, b = curve[1], curve[2]
+            u = _unit(b.x() - a.x(), b.y() - a.y())
+            if u:
+                dirs.extend([u, (-u[0], -u[1])])
+
+    for dep in point._dependents:
+        if hasattr(dep, 'p1') and hasattr(dep, 'p2'):
+            other = dep.p2 if dep.p1 is point else dep.p1
+            towards(other.scenePos(), both=isinstance(dep, LineItem))
+        elif isinstance(dep, PointItem) and dep.isVisible():
+            towards(dep.scenePos())
+        elif hasattr(dep, 'center_pt') and dep.center_pt is point:
+            continue                    # tâm đường tròn: không vướng gì
+        else:
+            for c in curves_of(dep):
+                along(c)
+    hosts = []
+    if isinstance(point, PointOnCurveItem):
+        hosts = [(point._host, point._index)]
+    elif isinstance(point, IntersectionPointItem):
+        hosts = list(point._hosts)
+    for host, k in hosts:
+        cs = curves_of(host)
+        if k < len(cs):
+            along(cs[k])
+    for attr in ('_p1', '_p2', '_src', '_a'):    # trung điểm, ảnh biến hình…
+        q = getattr(point, attr, None)
+        if isinstance(q, PointItem):
+            towards(q.scenePos())
+    return dirs
+
+
+def _outward_dir(point) -> tuple:
+    """Hướng đặt nhãn: xa các đường đi qua điểm, ưu tiên phía ngoài hình."""
+    p = point.scenePos()
+    cen = _figure_centroid(point.scene(), point)
+    away = _unit(p.x() - cen[0], p.y() - cen[1]) if cen else None
+    away = away or (0.7071, -0.7071)           # mặc định: phía trên-phải
+    dirs = _busy_dirs(point)
+    best, best_score = away, -1e9
+    for k in range(24):
+        t = k * math.pi / 12
+        d = (math.cos(t), math.sin(t))
+        gap = min((math.acos(max(-1.0, min(1.0, d[0] * u[0] + d[1] * u[1])))
+                   for u in dirs), default=math.pi)
+        score = min(gap, math.pi / 2) + 0.6 * (d[0] * away[0] + d[1] * away[1])
+        if score > best_score:
+            best, best_score = d, score
+    return best
+
+
 # ── Tên cho đường thẳng / tia ────────────────────────────────────────────────
 # Tên đường dùng lại PointLabelItem, gắn vào một điểm neo ẩn nằm trên đường
 # (PointOnCurveItem) → nhãn đi theo khi đường di chuyển, kéo được quanh điểm neo.
@@ -245,11 +346,18 @@ def make_line_name(scene, line, pos: QPointF, name: str) -> list:
     anchor.setVisible(False)
     anchor.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
     anchor.label = name
-    # Nhãn lệch về phía chỗ click (bên nào của đường)
-    dx, dy = pos.x() - foot.x(), pos.y() - foot.y()
-    d = math.hypot(dx, dy)
-    off = QPointF(dx / d * 14, dy / d * 14 + 5) if d > 2 else QPointF(9, -11)
-    return [anchor, PointLabelItem(anchor, name, off)]
+    # Nhãn đặt vuông góc với đường, về phía ngoài hình
+    a, b = c[1], c[2]
+    u = _unit(b.x() - a.x(), b.y() - a.y()) or (1.0, 0.0)
+    n = (-u[1], u[0])
+    cen = _figure_centroid(scene, None)
+    ref = cen if cen else (pos.x(), pos.y())
+    if (foot.x() - ref[0]) * n[0] + (foot.y() - ref[1]) * n[1] < 0:
+        n = (-n[0], -n[1])
+    label = PointLabelItem(anchor, name, QPointF(0, 0))
+    label._offset = label._offset_towards(n)
+    label._sync_pos()
+    return [anchor, label]
 
 
 def with_line_names(scene, items: list) -> list:

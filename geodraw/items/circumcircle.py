@@ -2,7 +2,7 @@ import math
 from PyQt6.QtWidgets import QGraphicsItem
 from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath
 from PyQt6.QtCore import QRectF, QPointF, Qt
-from .base import GeoItem, stroke_shape
+from .base import GeoItem, stroke_shape, CIRCLE_STROKE
 from .point import PointItem
 
 
@@ -100,7 +100,7 @@ class CircumcircleItem(GeoItem):
             return
         lc = self.mapFromScene(center)
         color = QColor(0, 120, 215) if self.isSelected() else self.color
-        pen = QPen(color, self.stroke_width)
+        pen = QPen(color, self.stroke_width * CIRCLE_STROKE)
         painter.setPen(pen)
         painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)

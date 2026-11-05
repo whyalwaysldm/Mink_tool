@@ -11,6 +11,10 @@ def stroke_shape(path: QPainterPath, width: float = 10.0) -> QPainterPath:
     return stroker.createStroke(path)
 
 
+# Đường tròn vẽ mảnh hơn đoạn / đường thẳng (tỉ lệ so với độ dày nét)
+CIRCLE_STROKE = 0.5
+
+
 class GeoItem(QGraphicsItem):
     """Abstract base for all geometry items."""
 

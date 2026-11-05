@@ -18,7 +18,6 @@ from .point import PointItem
 MAX_DIST = 160.0  # px — xa nhất nhãn có thể cách tâm điểm
 DEFAULT_FONT_SIZE = 9   # cỡ chữ tên điểm / tên đường
 LABEL_GAP = 4.4   # px — khoảng cách từ tâm điểm tới mép chữ khi tự đặt
-MIN_DIST =  7.0   # px — gần nhất (tránh đè lên dot điểm)
 
 
 class PointLabelItem(GeoItem):
@@ -135,7 +134,7 @@ class PointLabelItem(GeoItem):
             if self._moving_by_point or self._point.isSelected():
                 # Kéo đa-item hoặc programmatic → không constraint
                 return value
-            # Kéo nhãn một mình: giữ trong [MIN_DIST, MAX_DIST]
+            # Kéo nhãn một mình: tự do, chỉ giới hạn không quá xa điểm (MAX_DIST)
             pt  = self._point.scenePos()
             dx  = value.x() - pt.x()
             dy  = value.y() - pt.y()
@@ -145,9 +144,6 @@ class PointLabelItem(GeoItem):
             max_d = self._max_dist()
             if d > max_d:
                 s  = max_d / d
-                dx *= s; dy *= s
-            elif d < MIN_DIST:
-                s  = MIN_DIST / d
                 dx *= s; dy *= s
             return QPointF(pt.x() + dx, pt.y() + dy)
 

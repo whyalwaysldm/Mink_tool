@@ -411,6 +411,7 @@ class MainWindow(QMainWindow):
             "compass": "◎ Đường tròn bán kính = đoạn",
             "tangent_circle": "⦾ Đường tròn tiếp xúc",
             "tangent_lines": "⊲ Tiếp tuyến từ điểm ngoài",
+            "common_tangent": "⚭ Tiếp tuyến chung",
             "point_reflect": "⊕ Đối xứng tâm", "axis_reflect": "⇋ Đối xứng trục",
             "rotate": "↻ Phép quay", "homothety": "⤢ Phép vị tự",
             "circumcircle": "⊙ Ngoại tiếp", "rename_point": "Aa Đặt tên điểm",

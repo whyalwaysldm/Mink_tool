@@ -21,6 +21,7 @@ from .rename_point_tool import RenamePointTool
 from .measure_tool import MeasureTool
 from .tangent_circle_tool import TangentCircleTool
 from .tangent_lines_tool import TangentLinesTool
+from .common_tangent_tool import CommonTangentTool
 from .parallel_tool import ParallelTool, PerpendicularTool, CompassTool
 from .transform_tool import (PointReflectTool, AxisReflectTool,
                              RotateTool, HomothetyTool)
@@ -34,7 +35,7 @@ _DEFAULT_SHORTCUTS = {
     "K": "circumcircle", "N": "rename_point",
     "D": "measure",
     "Q": "parallel", "W": "perpendicular", "O": "compass",
-    "U": "tangent_circle", "Y": "tangent_lines",
+    "U": "tangent_circle", "Y": "tangent_lines", "X": "common_tangent",
     # Hình preset
     "F1": "rectangle", "F2": "square",
     "F3": "equilateral_triangle", "F4": "right_triangle",
@@ -78,7 +79,8 @@ class ToolManager(QObject):
         for cls in (MidpointTool, AngleBisectorTool, CircumcircleTool,
                     RenamePointTool, MeasureTool,
                     ParallelTool, PerpendicularTool, CompassTool,
-                    TangentCircleTool, TangentLinesTool, PointReflectTool, AxisReflectTool, RotateTool,
+                    TangentCircleTool, TangentLinesTool, CommonTangentTool,
+                    PointReflectTool, AxisReflectTool, RotateTool,
                     HomothetyTool):
             self._tools[cls.name] = mk(cls)
         self._current_name = "select"

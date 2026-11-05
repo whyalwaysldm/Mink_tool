@@ -51,6 +51,7 @@ TOOLBAR_LAYOUT = [
         ("circumcircle",   "⊙",  "Đường tròn ngoại tiếp 3 điểm (K)"),
         ("compass",        "◎",  "Đường tròn tâm + bán kính bằng đoạn thẳng (O)"),
         ("tangent_circle", "⦾",  "Đường tròn tiếp xúc 2 đường thẳng và 1 đường tròn (U)"),
+        ("tangent_lines",  "⊲",  "2 tiếp tuyến từ điểm nằm ngoài đường tròn (Y)"),
     ])),
     ("group", ("Tam giác / đa giác", [
         ("triangle",       "△",  "Tam giác (T)"),

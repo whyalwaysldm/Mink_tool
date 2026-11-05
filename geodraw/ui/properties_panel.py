@@ -14,7 +14,8 @@ class PropertiesPanel(QDockWidget):
         self._scene = scene
         self._tm = tool_manager
         self.setFeatures(QDockWidget.DockWidgetFeature.DockWidgetMovable |
-                         QDockWidget.DockWidgetFeature.DockWidgetFloatable)
+                         QDockWidget.DockWidgetFeature.DockWidgetFloatable |
+                         QDockWidget.DockWidgetFeature.DockWidgetClosable)
 
         w = QWidget()
         self.setWidget(w)

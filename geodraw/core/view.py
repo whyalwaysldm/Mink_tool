@@ -217,15 +217,14 @@ class GeoView(QGraphicsView):
 
     def set_zoom_percent(self, percent: int):
         """Đặt zoom cố định: 100 = 1 scene unit : 1 màn hình pixel.
-        Sau đó cuộn để hiện góc trên-trái của trang 1."""
+        Sau đó đặt giữa trang 1 vào giữa khung nhìn."""
         self.resetTransform()
         factor = max(0.05, percent / 100.0)
         self.scale(factor, factor)
         sc = self.scene()
         if hasattr(sc, 'page_rect'):
             pr = sc.page_rect(0)
-            # ensureVisible đảm bảo trang hiện ra với lề 30px mỗi phía
-            self.ensureVisible(pr, 30, 30)
+            self.centerOn(pr.center())
 
     def zoom_fit(self):
         from items.base import GeoItem

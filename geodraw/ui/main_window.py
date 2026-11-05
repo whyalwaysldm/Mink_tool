@@ -63,6 +63,14 @@ class MainWindow(QMainWindow):
         # Properties dock
         self._props = PropertiesPanel(first.scene, self._tm, self)
         self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._props)
+        # Ẩn / hiện bảng Thuộc tính: nút × trên bảng, F12, menu Xem, nút trên thanh
+        self._props_action = self._props.toggleViewAction()
+        self._props_action.setText("Bảng thuộc tính (F12)")
+        self._props_action.setShortcut("F12")
+        self._style_bar.addSeparator()
+        self._style_bar.addAction(self._props_action)
+        self._props.setVisible(AppSettings.load().show_properties)
+        self._props.visibilityChanged.connect(self._remember_props_visible)
 
         # Status bar
         self.setStatusBar(QStatusBar())
@@ -221,12 +229,7 @@ class MainWindow(QMainWindow):
         view_menu.addAction(act_zf)
 
         view_menu.addSeparator()
-        act_props = QAction("Bảng thuộc tính", self)
-        act_props.setCheckable(True)
-        act_props.setChecked(True)
-        act_props.triggered.connect(
-            lambda checked: self._props.setVisible(checked))
-        view_menu.addAction(act_props)
+        view_menu.addAction(self._props_action)
 
         # Settings
         settings_menu = mb.addMenu("Cài đặt")
@@ -374,6 +377,14 @@ class MainWindow(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self._apply_initial_zoom()
             self.statusBar().showMessage("✓ Đã lưu và áp dụng zoom", 3000)
+
+    def _remember_props_visible(self, *_):
+        if self.isMinimized() or not self.isVisible():
+            return                    # đang thu nhỏ / đóng cửa sổ: giữ nguyên
+        s = AppSettings.load()
+        if s.show_properties != self._props.isVisible():
+            s.show_properties = self._props.isVisible()
+            s.save()
 
     def _apply_initial_zoom(self):
         """Áp dụng zoom ban đầu theo cài đặt (gọi sau khi cửa sổ hiện)."""

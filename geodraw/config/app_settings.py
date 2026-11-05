@@ -8,6 +8,7 @@ _DEFAULTS = {
     "initial_zoom_percent": 0,   # 0 = "vừa trang tự động"
     "label_font_family": "Times New Roman",
     "label_font_size": 12,
+    "show_properties": True,     # hiện bảng Thuộc tính
 }
 
 
@@ -22,6 +23,8 @@ class AppSettings:
             "label_font_family", _DEFAULTS["label_font_family"]))
         self.label_font_size: int = int(data.get(
             "label_font_size", _DEFAULTS["label_font_size"]))
+        self.show_properties: bool = bool(data.get(
+            "show_properties", _DEFAULTS["show_properties"]))
 
     # ── I/O ──────────────────────────────────────────────────────────────
 
@@ -40,6 +43,7 @@ class AppSettings:
                 "initial_zoom_percent": self.initial_zoom_percent,
                 "label_font_family": self.label_font_family,
                 "label_font_size": self.label_font_size,
+                "show_properties": self.show_properties,
             }, indent=2, ensure_ascii=False),
             encoding="utf-8",
         )

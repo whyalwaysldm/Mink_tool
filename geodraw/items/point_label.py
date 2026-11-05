@@ -17,7 +17,7 @@ from .point import PointItem
 
 MAX_DIST = 160.0  # px — xa nhất nhãn có thể cách tâm điểm
 DEFAULT_FONT_SIZE = 9   # cỡ chữ tên điểm / tên đường
-LABEL_GAP = 11.0  # px — khoảng cách từ điểm tới tâm chữ khi tự đặt
+LABEL_GAP = 4.4   # px — khoảng cách từ tâm điểm tới mép chữ khi tự đặt
 MIN_DIST =  7.0   # px — gần nhất (tránh đè lên dot điểm)
 
 

@@ -118,8 +118,7 @@ class MainWindow(QMainWindow):
     def _new_session(self):
         """Ctrl+N: mở phiên làm việc mới trong tab mới, phiên cũ giữ nguyên."""
         idx = self._add_session(_Session())
-        self._tabs.setCurrentIndex(idx)
-        QTimer.singleShot(0, self._apply_initial_zoom)
+        self._tabs.setCurrentIndex(idx)   # view tự đặt giữa trang khi hiện ra
         self.statusBar().showMessage(
             f"✓ Đã mở {self._tabs.tabText(idx)} — các phiên cũ vẫn ở các tab trước",
             3000)
@@ -388,11 +387,7 @@ class MainWindow(QMainWindow):
 
     def _apply_initial_zoom(self):
         """Áp dụng zoom ban đầu theo cài đặt (gọi sau khi cửa sổ hiện)."""
-        pct = AppSettings.load().initial_zoom_percent
-        if pct > 0:
-            self._view.set_zoom_percent(pct)
-        else:
-            self._view.zoom_fit()
+        self._view.apply_initial_view()
 
     def _open_shortcut_editor(self):
         dlg = ShortcutEditorDialog(self._tm, self)

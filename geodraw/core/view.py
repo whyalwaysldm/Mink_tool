@@ -92,8 +92,11 @@ class GeoView(QGraphicsView):
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
         self.setTransformationAnchor(
             QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        # Đổi cỡ khung nhìn (thêm thanh tab, ẩn bảng Thuộc tính…) → giữ nguyên tâm
         self.setResizeAnchor(
-            QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+            QGraphicsView.ViewportAnchor.AnchorViewCenter)
+        # Chưa thao tác gì → mỗi lần hiện / đổi cỡ lại đặt giữa trang
+        self._initial_view = True
         self.setMouseTracking(True)
         self.setAttribute(Qt.WidgetAttribute.WA_TabletTracking, True)
         # Nền xám khớp với drawBackground của scene
@@ -179,8 +182,28 @@ class GeoView(QGraphicsView):
             self._last_tap = (timer, pos)
         return is_double
 
+    # ── Khung nhìn ban đầu: zoom theo cài đặt, giữa trang 1 ────────────
+    def apply_initial_view(self):
+        from config.app_settings import AppSettings
+        pct = AppSettings.load().initial_zoom_percent
+        if pct > 0:
+            self.set_zoom_percent(pct)
+        else:
+            self.zoom_fit()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._initial_view:
+            self.apply_initial_view()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self._initial_view and self.isVisible():
+            self.apply_initial_view()
+
     # ── Mouse events ────────────────────────────────────────────────────
     def mousePressEvent(self, event):
+        self._initial_view = False      # người dùng đã bắt đầu thao tác
         super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
@@ -202,6 +225,7 @@ class GeoView(QGraphicsView):
 
     # ── Zoom via Ctrl+scroll ─────────────────────────────────────────────
     def wheelEvent(self, event: QWheelEvent):
+        self._initial_view = False
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
             self.scale(factor, factor)
@@ -210,9 +234,11 @@ class GeoView(QGraphicsView):
             super().wheelEvent(event)
 
     def zoom_in(self):
+        self._initial_view = False
         self.scale(1.2, 1.2)
 
     def zoom_out(self):
+        self._initial_view = False
         self.scale(1 / 1.2, 1 / 1.2)
 
     def set_zoom_percent(self, percent: int):

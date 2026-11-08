@@ -1,4 +1,5 @@
-"""Nhập số đo góc cho tam giác thường (đa giác 3 đỉnh) và tam giác cân."""
+"""Nhập số đo góc cho tam giác thường (đa giác 3 đỉnh), tam giác cân, và góc
+tại một đỉnh của đa giác / tam giác."""
 import math
 from PyQt6.QtCore import QPointF
 from PyQt6.QtWidgets import (QDialog, QFormLayout, QDoubleSpinBox, QLabel,
@@ -13,9 +14,11 @@ def triangle_at(scene, hits: list):
     """Tam giác (thường hoặc cân) trong danh sách item tại vị trí click."""
     from items.shape import shape_of
     from items.polygon import PolygonItem
+    from items.shape import FREE_KINDS
     for it in hits:
         shp = shape_of(it)
-        if shp is not None and _is_isosceles(shp):
+        if shp is not None and (_is_isosceles(shp) or
+                                (shp.kind in FREE_KINDS and len(shp.points) == 3)):
             return shp
         if isinstance(it, PolygonItem) and len(it.points) == 3:
             return it
@@ -127,4 +130,74 @@ def edit_triangle_angles(item, scene, history) -> bool:
     if getattr(target, "is_constrained", False):
         return False
     history.push_move(target, QPointF(target.pos()), new_c)
+    return True
+
+
+# ── Góc tại một đỉnh của đa giác / tam giác ──────────────────────────────────
+
+def polygon_at_vertex(pt):
+    """(đa giác, chỉ số đỉnh) mà pt là đỉnh, hoặc None."""
+    from items.shape import ShapeItem, FREE_KINDS
+    for d in getattr(pt, "_dependents", ()):
+        if isinstance(d, ShapeItem) and d.kind in FREE_KINDS \
+                and d.scene() is not None and pt in d.points:
+            return d, d.points.index(pt)
+    return None
+
+
+def _cross(a: QPointF, b: QPointF) -> float:
+    return a.x() * b.y() - a.y() * b.x()
+
+
+def _orientation(pts: list) -> float:
+    """+1 / −1 theo chiều vẽ đa giác (dấu diện tích có hướng)."""
+    n = len(pts)
+    s = sum(_cross(pts[k], pts[(k + 1) % n]) for k in range(n))
+    return 1.0 if s >= 0 else -1.0
+
+
+def interior_angle(pts: list, k: int) -> float:
+    """Góc trong của đa giác tại đỉnh k (0–360°, đa giác lõm có góc > 180°)."""
+    n = len(pts)
+    a = pts[k - 1] - pts[k]
+    b = pts[(k + 1) % n] - pts[k]
+    t = math.degrees(math.atan2(_cross(b, a), b.x() * a.x() + b.y() * a.y()))
+    return (t * _orientation(pts)) % 360.0
+
+
+def edit_vertex_angle(poly, k: int, scene, history) -> bool:
+    """
+    Đổi góc tại đỉnh k: chỉ đỉnh kế tiếp (theo thứ tự vẽ) quay quanh đỉnh k,
+    giữ nguyên độ dài cạnh; các đỉnh vẽ trước đỉnh k đứng yên.
+    """
+    from PyQt6.QtWidgets import QInputDialog, QMessageBox
+    pts_items = poly.points
+    n = len(pts_items)
+    nxt = pts_items[(k + 1) % n]
+    views = scene.views()
+    parent = views[0] if views else None
+    names = [getattr(p, "label", "") or f"đỉnh {i + 1}"
+             for i, p in enumerate(pts_items)]
+    if getattr(nxt, "is_constrained", False):
+        QMessageBox.information(parent, "Số đo góc",
+                                f"Không đổi được: {names[(k + 1) % n]} là điểm "
+                                "dựng hình, không di chuyển tự do được.")
+        return False
+    pts = [p.scenePos() for p in pts_items]
+    cur = interior_angle(pts, k)
+    hi = 179.9 if n == 3 else 359.9
+    val, ok = QInputDialog.getDouble(
+        parent, "Số đo góc",
+        f"Góc tại {names[k]} (đổi bằng cách di chuyển {names[(k + 1) % n]}):",
+        round(cur, 1), 0.1, hi, 1)
+    if not ok:
+        return False
+    a = pts[k - 1] - pts[k]
+    b = pts[(k + 1) % n] - pts[k]
+    la, lb = math.hypot(a.x(), a.y()), math.hypot(b.x(), b.y())
+    if la < 1e-9 or lb < 1e-9:
+        return False
+    u = _rotate(a, -_orientation(pts) * val)
+    new_pos = pts[k] + u * (lb / la)
+    history.push_move(nxt, QPointF(nxt.pos()), new_pos)
     return True

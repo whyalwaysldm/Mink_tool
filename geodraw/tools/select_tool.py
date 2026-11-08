@@ -203,7 +203,9 @@ class SelectTool(BaseTool):
     # ── Chuột phải: menu (nhập số đo góc tam giác) ───────────────────
 
     def _context_menu(self, pos: QPointF):
-        from tools.triangle_angles import triangle_at, edit_triangle_angles
+        from tools.triangle_angles import (triangle_at, edit_triangle_angles,
+                                           polygon_at_vertex, edit_vertex_angle)
+        from items.point import PointItem
         from tools.transform_tool import add_mark_actions
         from PyQt6.QtWidgets import QMenu
         from PyQt6.QtGui import QCursor
@@ -211,7 +213,16 @@ class SelectTool(BaseTool):
         tri = triangle_at(self.scene, hits)
         view = self.scene.views()[0] if self.scene.views() else None
         menu = QMenu(view)
-        if tri is not None:
+        snapped, _ = self.scene.snap(pos)
+        pt = snapped if isinstance(snapped, PointItem) else \
+            next((it for it in hits if isinstance(it, PointItem)), None)
+        at_vertex = polygon_at_vertex(pt) if pt is not None else None
+        if at_vertex is not None:
+            poly, k = at_vertex
+            name = f" {pt.label}" if pt.label else ""
+            menu.addAction(f"Số đo góc tại đỉnh{name}…").triggered.connect(
+                lambda: edit_vertex_angle(poly, k, self.scene, self.history))
+        elif tri is not None:
             menu.addAction("Nhập số đo góc…").triggered.connect(
                 lambda: edit_triangle_angles(tri, self.scene, self.history))
         add_mark_actions(menu, self.scene, self.history, pos, hits,

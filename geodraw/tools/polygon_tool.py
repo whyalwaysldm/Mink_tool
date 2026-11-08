@@ -3,7 +3,8 @@ from PyQt6.QtWidgets import QGraphicsPolygonItem
 from PyQt6.QtGui import QPen, QBrush, QPolygonF, QColor
 from .base_tool import BaseTool
 from items.point import PointItem
-from items.polygon import PolygonItem, TriangleItem
+from items.shape import ShapeItem
+from items.segment import SegmentItem
 
 
 class PolygonTool(BaseTool):
@@ -54,15 +55,15 @@ class PolygonTool(BaseTool):
             self.deactivate()
             self.activate()
             return
-        cls = TriangleItem if len(self._pts) == 3 and isinstance(self, TriangleTool) \
-              else PolygonItem
-        poly = PolygonItem(self._pts)
-        self.scene.addItem(poly)
-        to_record = [self._pts[i] for i, n in enumerate(self._pts_new) if n] + [poly]
-        if len(to_record) == 1:
-            self.history.push_add(self.scene, to_record[0])
-        else:
-            self.history.push_add_batch(self.scene, to_record)
+        # Mỗi cạnh là một đoạn riêng → click 1 lần chọn cạnh, double-click
+        # mới chọn cả hình (như hình mẫu); kéo đỉnh tự do
+        n = len(self._pts)
+        edges = [SegmentItem(self._pts[k], self._pts[(k + 1) % n])
+                 for k in range(n)]
+        label = "tam giác" if n == 3 else "đa giác"
+        poly = ShapeItem(self._pts, label, kind=self.name, edges=edges)
+        new_pts = [p for p, is_new in zip(self._pts, self._pts_new) if is_new]
+        self.history.push_add_batch(self.scene, new_pts + [poly] + edges)
         self._pts = []
         self._pts_new = []
         self._remove_ghost()

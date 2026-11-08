@@ -48,6 +48,10 @@ def _keep_sign(val: float, ref: float, min_abs: float = 4.0) -> float:
     return sign * max(min_abs, val * sign)
 
 
+# Hình vẽ bằng tool đa giác / tam giác thường (không ràng buộc hình dạng)
+FREE_KINDS = ("polygon", "triangle")
+
+
 def _solve(kind: str, i: int, L: list, m: QPointF):
     """
     Quy tắc kéo đỉnh i tới m cho từng loại hình (L = vị trí cũ các đỉnh).
@@ -55,6 +59,12 @@ def _solve(kind: str, i: int, L: list, m: QPointF):
     (co giãn + xoay quanh đỉnh đối diện, giữ nguyên hình dạng).
     """
     n = len(L)
+    if kind in FREE_KINDS:
+        # Đa giác / tam giác thường: kéo đỉnh nào chỉ đỉnh đó đổi chỗ
+        out = list(L)
+        out[i] = m
+        return out
+
     if kind == "rectangle":
         # Đỉnh đối diện đứng yên, 2 trục giữ nguyên → đổi dài / rộng tự do
         j = (i + 2) % 4

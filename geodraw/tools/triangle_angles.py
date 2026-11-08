@@ -187,8 +187,8 @@ def _turn(center: QPointF, ref: QPointF, length_of: QPointF,
 def angle_targets(kind: str, pts: list, k: int, val: float):
     """
     Vị trí mới các đỉnh để góc tại đỉnh k bằng val (None → không làm được).
-      • đa giác / tam giác: đỉnh kế tiếp (theo thứ tự vẽ) quay quanh đỉnh k,
-        các đỉnh khác đứng yên;
+      • đa giác / tam giác: chỉ đỉnh kế tiếp k+1 (theo thứ tự vẽ) di chuyển,
+        trượt trên cạnh (k+1)–(k+2) để góc tại đỉnh k+2 giữ nguyên;
       • hình bình hành / thoi: đỉnh k và đỉnh trước nó đứng yên, đỉnh kế tiếp
         quay quanh k (giữ độ dài cạnh), đỉnh thứ tư tự đặt;
       • hình thang cân: đáy 0–1 đứng yên, 2 cạnh bên cùng quay (giữ độ dài)
@@ -231,10 +231,20 @@ def angle_targets(kind: str, pts: list, k: int, val: float):
                 any(interior_angle(out, i) >= 180.0 for i in range(n)):
             return None
     else:
-        nxt = _turn(pts[k], pts[k - 1], pts[(k + 1) % n], -o * val)
-        if nxt is None:
+        # Tia mới từ đỉnh k cắt đường thẳng (k+2)→(k+1) tại vị trí mới của k+1
+        j, j2 = (k + 1) % n, (k + 2) % n
+        d = _rotate(pts[k - 1] - pts[k], -o * val)
+        e = pts[j] - pts[j2]
+        w = pts[j2] - pts[k]
+        den = _cross(d, e)
+        if abs(den) < 1e-9:
             return None
-        out[(k + 1) % n] = nxt
+        t, s = _cross(w, e) / den, _cross(w, d) / den
+        if t <= 1e-6 or s <= 1e-6:
+            return None               # 2 tia không cắt nhau → không đặt được
+        out[j] = pts[k] + d * t
+        if abs(interior_angle(out, k) - val) > 0.05:
+            return None               # hình bị lật
     return out
 
 
@@ -251,7 +261,8 @@ def edit_vertex_angle(poly, k: int, scene, history) -> bool:
     cur = interior_angle(pts, k)
     hi = 359.9 if (poly.kind == "polygon" and n > 3) else 179.9
     if poly.kind in ("polygon", "triangle"):
-        how = f" (đổi bằng cách di chuyển {names[(k + 1) % n]})"
+        how = (f" (di chuyển {names[(k + 1) % n]}, "
+               f"giữ nguyên góc tại {names[(k + 2) % n]})")
     else:
         how = ""
     val, ok = QInputDialog.getDouble(

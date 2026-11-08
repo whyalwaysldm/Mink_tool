@@ -133,13 +133,18 @@ def edit_triangle_angles(item, scene, history) -> bool:
     return True
 
 
-# ── Góc tại một đỉnh của đa giác / tam giác ──────────────────────────────────
+# ── Góc tại một đỉnh của đa giác / tam giác / hình bình hành… ────────────────
+
+# Hình có góc đổi được (hình vuông, chữ nhật, đa giác đều… có góc cố định)
+_SIDE_KINDS = ("parallelogram", "rhombus")
+ANGLE_KINDS = ("polygon", "triangle", "trapezoid") + _SIDE_KINDS
+
 
 def polygon_at_vertex(pt):
-    """(đa giác, chỉ số đỉnh) mà pt là đỉnh, hoặc None."""
-    from items.shape import ShapeItem, FREE_KINDS
+    """(hình, chỉ số đỉnh) mà pt là đỉnh và góc tại đó đổi được, hoặc None."""
+    from items.shape import ShapeItem
     for d in getattr(pt, "_dependents", ()):
-        if isinstance(d, ShapeItem) and d.kind in FREE_KINDS \
+        if isinstance(d, ShapeItem) and d.kind in ANGLE_KINDS \
                 and d.scene() is not None and pt in d.points:
             return d, d.points.index(pt)
     return None
@@ -165,39 +170,101 @@ def interior_angle(pts: list, k: int) -> float:
     return (t * _orientation(pts)) % 360.0
 
 
+def _turn(center: QPointF, ref: QPointF, length_of: QPointF,
+          deg: float) -> QPointF:
+    """Điểm cách center bằng |length_of − center|, theo hướng (ref − center)
+    quay deg độ."""
+    v = ref - center
+    lv = math.hypot(v.x(), v.y())
+    w = length_of - center
+    lw = math.hypot(w.x(), w.y())
+    if lv < 1e-9 or lw < 1e-9:
+        return None
+    return center + _rotate(v, deg) * (lw / lv)
+
+
+def angle_targets(kind: str, pts: list, k: int, val: float):
+    """
+    Vị trí mới các đỉnh để góc tại đỉnh k bằng val (None → không làm được).
+      • đa giác / tam giác: đỉnh kế tiếp (theo thứ tự vẽ) quay quanh đỉnh k,
+        các đỉnh khác đứng yên;
+      • hình bình hành / thoi: đỉnh k và đỉnh trước nó đứng yên, đỉnh kế tiếp
+        quay quanh k (giữ độ dài cạnh), đỉnh thứ tư tự đặt;
+      • hình thang: đáy 0–1 đứng yên, cạnh bên phía đỉnh k quay quanh đầu mút
+        trên đáy, đáy nhỏ tịnh tiến theo (giữ độ dài).
+    """
+    n = len(pts)
+    o = _orientation(pts)
+    out = list(pts)
+    if kind in _SIDE_KINDS:
+        nxt = _turn(pts[k], pts[k - 1], pts[(k + 1) % n], -o * val)
+        if nxt is None:
+            return None
+        out[(k + 1) % n] = nxt
+        out[(k + 2) % n] = pts[k - 1] + (nxt - pts[k])
+    elif kind == "trapezoid":
+        # góc ở 2 đỉnh kề một cạnh bên bù nhau
+        beta = val if k in (0, 1) else 180.0 - val
+        if k in (0, 3):
+            top = _turn(pts[0], pts[1], pts[3], o * beta)
+            if top is None:
+                return None
+            d = top - pts[3]
+        else:
+            top = _turn(pts[1], pts[0], pts[2], -o * beta)
+            if top is None:
+                return None
+            d = top - pts[2]
+        out[2] = pts[2] + d
+        out[3] = pts[3] + d
+        # cạnh bên không được cắt nhau (hình phải lồi)
+        if _orientation(out) != o or \
+                any(interior_angle(out, i) >= 180.0 for i in range(n)):
+            return None
+    else:
+        nxt = _turn(pts[k], pts[k - 1], pts[(k + 1) % n], -o * val)
+        if nxt is None:
+            return None
+        out[(k + 1) % n] = nxt
+    return out
+
+
 def edit_vertex_angle(poly, k: int, scene, history) -> bool:
-    """
-    Đổi góc tại đỉnh k: chỉ đỉnh kế tiếp (theo thứ tự vẽ) quay quanh đỉnh k,
-    giữ nguyên độ dài cạnh; các đỉnh vẽ trước đỉnh k đứng yên.
-    """
+    """Hỏi số đo góc tại đỉnh k rồi đổi hình theo angle_targets."""
     from PyQt6.QtWidgets import QInputDialog, QMessageBox
-    pts_items = poly.points
-    n = len(pts_items)
-    nxt = pts_items[(k + 1) % n]
+    items = poly.points
+    n = len(items)
     views = scene.views()
     parent = views[0] if views else None
     names = [getattr(p, "label", "") or f"đỉnh {i + 1}"
-             for i, p in enumerate(pts_items)]
-    if getattr(nxt, "is_constrained", False):
-        QMessageBox.information(parent, "Số đo góc",
-                                f"Không đổi được: {names[(k + 1) % n]} là điểm "
-                                "dựng hình, không di chuyển tự do được.")
-        return False
-    pts = [p.scenePos() for p in pts_items]
+             for i, p in enumerate(items)]
+    pts = [p.scenePos() for p in items]
     cur = interior_angle(pts, k)
-    hi = 179.9 if n == 3 else 359.9
+    hi = 359.9 if (poly.kind == "polygon" and n > 3) else 179.9
+    if poly.kind in ("polygon", "triangle"):
+        how = f" (đổi bằng cách di chuyển {names[(k + 1) % n]})"
+    else:
+        how = ""
     val, ok = QInputDialog.getDouble(
-        parent, "Số đo góc",
-        f"Góc tại {names[k]} (đổi bằng cách di chuyển {names[(k + 1) % n]}):",
+        parent, "Số đo góc", f"Góc tại {names[k]}{how}:",
         round(cur, 1), 0.1, hi, 1)
     if not ok:
         return False
-    a = pts[k - 1] - pts[k]
-    b = pts[(k + 1) % n] - pts[k]
-    la, lb = math.hypot(a.x(), a.y()), math.hypot(b.x(), b.y())
-    if la < 1e-9 or lb < 1e-9:
+    out = angle_targets(poly.kind, pts, k, val)
+    if out is None:
+        QMessageBox.information(parent, "Số đo góc",
+                                f"Không đặt được góc {val:g}° cho "
+                                f"{poly.shape_label} này.")
         return False
-    u = _rotate(a, -_orientation(pts) * val)
-    new_pos = pts[k] + u * (lb / la)
-    history.push_move(nxt, QPointF(nxt.pos()), new_pos)
+    moves = [(it, QPointF(it.pos()), it.pos() + (out[i] - pts[i]))
+             for i, it in enumerate(items)
+             if (out[i] - pts[i]).manhattanLength() > 1e-9]
+    stuck = [names[items.index(m[0])] for m in moves
+             if getattr(m[0], "is_constrained", False)]
+    if stuck:
+        QMessageBox.information(parent, "Số đo góc",
+                                f"Không đổi được: {', '.join(stuck)} là điểm "
+                                "dựng hình, không di chuyển tự do được.")
+        return False
+    history.push_move_group(moves)
     return True

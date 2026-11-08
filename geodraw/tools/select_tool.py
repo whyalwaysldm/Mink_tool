@@ -225,6 +225,12 @@ class SelectTool(BaseTool):
         elif tri is not None:
             menu.addAction("Nhập số đo góc…").triggered.connect(
                 lambda: edit_triangle_angles(tri, self.scene, self.history))
+        from tools.shape_sides import shape_for_sides, edit_shape_sides
+        quad = shape_for_sides(([pt] if pt is not None else []) + hits)
+        if quad is not None:
+            label = "Số đo cạnh / đường chéo…" if quad.kind == "rhombus"                 else "Số đo cạnh…"
+            menu.addAction(label).triggered.connect(
+                lambda: edit_shape_sides(quad, self.scene, self.history))
         add_mark_actions(menu, self.scene, self.history, pos, hits,
                          on_change=self.tm.status_hint.emit)
         menu.exec(QCursor.pos())

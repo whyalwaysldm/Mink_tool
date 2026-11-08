@@ -137,7 +137,8 @@ def edit_triangle_angles(item, scene, history) -> bool:
 
 # Hình có góc đổi được (hình vuông, chữ nhật, đa giác đều… có góc cố định)
 _SIDE_KINDS = ("parallelogram", "rhombus")
-ANGLE_KINDS = ("polygon", "triangle", "trapezoid") + _SIDE_KINDS
+ANGLE_KINDS = ("polygon", "triangle", "trapezoid",
+               "isosceles_trapezoid") + _SIDE_KINDS
 
 
 def polygon_at_vertex(pt):
@@ -190,6 +191,8 @@ def angle_targets(kind: str, pts: list, k: int, val: float):
         các đỉnh khác đứng yên;
       • hình bình hành / thoi: đỉnh k và đỉnh trước nó đứng yên, đỉnh kế tiếp
         quay quanh k (giữ độ dài cạnh), đỉnh thứ tư tự đặt;
+      • hình thang cân: đáy 0–1 đứng yên, 2 cạnh bên cùng quay (giữ độ dài)
+        để 2 góc ở đáy bằng nhau;
       • hình thang: đáy 0–1 đứng yên, cạnh bên phía đỉnh k quay quanh đầu mút
         trên đáy, đáy nhỏ tịnh tiến theo (giữ độ dài).
     """
@@ -202,10 +205,15 @@ def angle_targets(kind: str, pts: list, k: int, val: float):
             return None
         out[(k + 1) % n] = nxt
         out[(k + 2) % n] = pts[k - 1] + (nxt - pts[k])
-    elif kind == "trapezoid":
+    elif kind in ("trapezoid", "isosceles_trapezoid"):
         # góc ở 2 đỉnh kề một cạnh bên bù nhau
         beta = val if k in (0, 1) else 180.0 - val
-        if k in (0, 3):
+        if kind == "isosceles_trapezoid":
+            out[3] = _turn(pts[0], pts[1], pts[3], o * beta)
+            out[2] = _turn(pts[1], pts[0], pts[2], -o * beta)
+            if out[2] is None or out[3] is None:
+                return None
+        elif k in (0, 3):
             top = _turn(pts[0], pts[1], pts[3], o * beta)
             if top is None:
                 return None
@@ -215,8 +223,9 @@ def angle_targets(kind: str, pts: list, k: int, val: float):
             if top is None:
                 return None
             d = top - pts[2]
-        out[2] = pts[2] + d
-        out[3] = pts[3] + d
+        if kind == "trapezoid":
+            out[2] = pts[2] + d
+            out[3] = pts[3] + d
         # cạnh bên không được cắt nhau (hình phải lồi)
         if _orientation(out) != o or \
                 any(interior_angle(out, i) >= 180.0 for i in range(n)):

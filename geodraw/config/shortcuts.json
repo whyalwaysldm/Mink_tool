@@ -36,5 +36,6 @@
   "F8": "parallelogram",
   "F9": "trapezoid",
   "F10": "hexagon",
-  "F11": "pentagon"
+  "F11": "pentagon",
+  "F12": "isosceles_trapezoid"
 }

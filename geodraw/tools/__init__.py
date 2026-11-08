@@ -42,6 +42,7 @@ _DEFAULT_SHORTCUTS = {
     "F5": "isosceles_right_triangle", "F6": "isosceles_triangle",
     "F7": "rhombus", "F8": "parallelogram",
     "F9": "trapezoid", "F10": "hexagon", "F11": "pentagon",
+    "F12": "isosceles_trapezoid",
 }
 
 

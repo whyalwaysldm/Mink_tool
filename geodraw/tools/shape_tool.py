@@ -366,6 +366,28 @@ class TrapezoidTool(_ClickShapeTool):
         return [a, b, c, QPointF(c.x() + u.x() * t, c.y() + u.y() * t)]
 
 
+class IsoscelesTrapezoidTool(_ClickShapeTool):
+    """Click 2 đỉnh của đáy, rồi đỉnh thứ ba; đỉnh thứ tư đối xứng với nó
+    qua trung trực của đáy."""
+    name = "isosceles_trapezoid"
+    shape_label = "Hình thang cân"
+    hints = ("Hình thang cân: click đỉnh thứ nhất của đáy",
+             "Hình thang cân: click đỉnh thứ hai của đáy",
+             "Hình thang cân: click đỉnh thứ ba (đỉnh thứ tư tự đặt)")
+
+    def _vertices(self, m):
+        a, b = self._clicks
+        if _height(a, b, m) < 3:
+            return None
+        u = _sub(b, a)
+        L2 = (u.x() ** 2 + u.y() ** 2) or 1.0
+        mid = QPointF((a.x() + b.x()) / 2, (a.y() + b.y()) / 2)
+        t = ((m.x() - mid.x()) * u.x() + (m.y() - mid.y()) * u.y()) / L2
+        if t < 0.01:
+            return None               # đỉnh thứ ba phải ở phía đỉnh thứ hai
+        return [a, b, m, QPointF(m.x() - 2 * t * u.x(), m.y() - 2 * t * u.y())]
+
+
 class RegularHexagonTool(_RegularPolygonTool):
     name = "hexagon"
     shape_label = "Lục giác đều"
@@ -389,6 +411,7 @@ ALL_SHAPE_TOOLS = [
     RhombusTool,
     ParallelogramTool,
     TrapezoidTool,
+    IsoscelesTrapezoidTool,
     RegularHexagonTool,
     RegularPentagonTool,
 ]

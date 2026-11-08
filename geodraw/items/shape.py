@@ -117,6 +117,20 @@ def _solve(kind: str, i: int, L: list, m: QPointF):
         out[o] = L[0] + _unit(L[o] - L[0]) * r
         return out
 
+    if kind == "isosceles_trapezoid" and i in (2, 3):
+        # Đáy lớn giữ nguyên; đỉnh còn lại của đáy nhỏ đối xứng qua trung trực
+        mid = (L[0] + L[1]) / 2
+        u = _unit(L[1] - L[0])
+        t = _dot(m - mid, u)
+        h = _cross(u, m - mid)
+        if (t if i == 2 else -t) < 2.0 or h * _cross(u, L[2] - mid) <= 0 \
+                or abs(h) < 4.0:
+            return list(L)            # không cho hình bị lật / dẹt
+        out = list(L)
+        out[i] = m
+        out[5 - i] = m - u * (2 * t)
+        return out
+
     if kind == "parallelogram" and i in (2, 3):
         # Đáy 0-1 giữ nguyên; cạnh bên đổi hướng / độ dài tự do
         base = L[1] - L[0]

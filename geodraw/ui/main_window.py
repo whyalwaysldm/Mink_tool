@@ -418,7 +418,8 @@ class MainWindow(QMainWindow):
             "isosceles_right_triangle": "◿ Tam giác vuông cân",
             "isosceles_triangle": "🔺 Tam giác cân",
             "rhombus": "◇ Hình thoi", "parallelogram": "▱ Hình bình hành",
-            "trapezoid": "⏢ Hình thang", "hexagon": "⬡ Lục giác đều",
+            "trapezoid": "⏢ Hình thang",
+            "isosceles_trapezoid": "⏥ Hình thang cân", "hexagon": "⬡ Lục giác đều",
             "pentagon": "⬠ Ngũ giác đều",
         }
         self.statusBar().showMessage(f"Công cụ: {labels.get(name, name)}")

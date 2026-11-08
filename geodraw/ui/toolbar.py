@@ -21,6 +21,7 @@ SHAPE_TOOLS = [
     ("rhombus",                 "◇",  "Hình thoi (F7)"),
     ("parallelogram",           "▱",  "Hình bình hành (F8)"),
     ("trapezoid",               "⏢",  "Hình thang (F9)"),
+    ("isosceles_trapezoid",     "⏥",  "Hình thang cân (F12)"),
     ("hexagon",                 "⬡",  "Lục giác đều (F10)"),
     ("pentagon",                "⬠",  "Ngũ giác đều (F11)"),
 ]

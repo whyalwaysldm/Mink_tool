@@ -205,7 +205,8 @@ def edit_shape_sides(shape, scene, history) -> bool:
     if len(items) != 4:
         return False
     P = [p.scenePos() for p in items]
-    names = [getattr(p, "label", "") or "ABCD"[i] for i, p in enumerate(items)]
+    from items.point_label import vertex_names
+    names = vertex_names(items)
     views = scene.views()
     parent = views[0] if views else None
     diag = diagonal_segments(scene, items) if shape.kind == "rhombus" else (False, False)

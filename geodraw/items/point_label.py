@@ -366,3 +366,40 @@ def with_line_names(scene, items: list) -> list:
                 if extra not in result:
                     result.append(extra)
     return result
+
+
+# ── Tên hiển thị của các đỉnh (dùng trong hộp thoại số đo) ────────────────────
+
+def vertex_names(points: list) -> list:
+    """
+    Tên các đỉnh để hiện trong hộp thoại: tên điểm; nếu điểm chưa có tên thì
+    lấy tên của điểm trùng chỗ / nhãn tự do ngay cạnh nó; còn không thì một
+    chữ cái chưa dùng.
+    """
+    from items.label import LabelItem
+    scene = next((p.scene() for p in points if p.scene() is not None), None)
+    names = []
+    for p in points:
+        name = getattr(p, "label", "")
+        if not name and scene is not None:
+            pos = p.scenePos()
+            near = [q for q in scene.point_items()
+                    if q is not p and q.label and
+                    math.hypot(q.scenePos().x() - pos.x(),
+                               q.scenePos().y() - pos.y()) < 6]
+            if near:
+                name = near[0].label
+            else:
+                best, best_d = None, 25.0
+                for it in scene.items():
+                    if isinstance(it, LabelItem) and it.text.strip():
+                        c = it.sceneBoundingRect().center()
+                        d = math.hypot(c.x() - pos.x(), c.y() - pos.y())
+                        if d < best_d:
+                            best, best_d = it, d
+                if best is not None:
+                    name = best.text.strip()
+        names.append(name)
+    used = set(n for n in names if n)
+    letters = (c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if c not in used)
+    return [n or next(letters, "?") for n in names]

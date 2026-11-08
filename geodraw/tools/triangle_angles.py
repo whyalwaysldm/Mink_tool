@@ -42,10 +42,8 @@ def _rotate(v: QPointF, deg: float) -> QPointF:
 
 
 def _names(points: list) -> list:
-    out = []
-    for k, p in enumerate(points):
-        out.append(getattr(p, "label", "") or "ABC"[k])
-    return out
+    from items.point_label import vertex_names
+    return vertex_names(points)
 
 
 class _AnglesDialog(QDialog):
@@ -255,8 +253,8 @@ def edit_vertex_angle(poly, k: int, scene, history) -> bool:
     n = len(items)
     views = scene.views()
     parent = views[0] if views else None
-    names = [getattr(p, "label", "") or f"đỉnh {i + 1}"
-             for i, p in enumerate(items)]
+    from items.point_label import vertex_names
+    names = vertex_names(items)
     pts = [p.scenePos() for p in items]
     cur = interior_angle(pts, k)
     hi = 359.9 if (poly.kind == "polygon" and n > 3) else 179.9

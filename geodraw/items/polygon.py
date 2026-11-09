@@ -11,7 +11,7 @@ class PolygonItem(GeoItem):
                  fill_color=None, closed=True):
         super().__init__(color, width)
         self.points: list = list(points)
-        self.fill_color: QColor = fill_color or QColor(200, 220, 255, 60)
+        self.fill_color: QColor = fill_color or QColor(Qt.GlobalColor.transparent)
         self.closed = closed
         for p in self.points:
             p.add_dependent(self)

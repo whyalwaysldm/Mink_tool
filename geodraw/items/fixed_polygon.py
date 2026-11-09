@@ -11,7 +11,7 @@ class FixedPolygonItem(GeoItem):
     def __init__(self, points: list, color=None, width=None, fill_color=None):
         super().__init__(color, width)
         self._points: list = [QPointF(p) for p in points]
-        self.fill_color: QColor = fill_color or QColor(200, 220, 255, 50)
+        self.fill_color: QColor = fill_color or QColor(Qt.GlobalColor.transparent)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)

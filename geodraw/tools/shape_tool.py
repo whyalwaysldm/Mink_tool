@@ -47,7 +47,7 @@ class PresetShapeTool(BaseTool):
             self._ghost = QGraphicsPolygonItem()
             self._ghost.setPen(QPen(QColor(0, 120, 215, 160), 1.5,
                                     Qt.PenStyle.DashLine))
-            self._ghost.setBrush(QBrush(QColor(0, 120, 215, 25)))
+            self._ghost.setBrush(QBrush(Qt.BrushStyle.NoBrush))
             self._ghost.setZValue(50)
             self.scene.addItem(self._ghost)
 

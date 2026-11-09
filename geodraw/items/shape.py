@@ -175,7 +175,7 @@ class ShapeItem(GeoItem):
         self.shape_label = shape_label
         # Loại hình (tên tool: rectangle, rhombus…) → quy tắc kéo đỉnh riêng
         self.kind = kind
-        self.fill_color: QColor = fill_color or QColor(200, 220, 255, 50)
+        self.fill_color: QColor = fill_color or QColor(Qt.GlobalColor.transparent)
         self._updating = False
         self._last: list = []
         for p in self.points:

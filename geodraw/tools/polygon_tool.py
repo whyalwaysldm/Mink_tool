@@ -110,3 +110,60 @@ class PolygonTool(BaseTool):
 class TriangleTool(PolygonTool):
     name = "triangle"
     _max_pts = 3
+
+
+class TriangleAltitudesTool(TriangleTool):
+    """
+    Tam giác + 3 đường cao: click 3 đỉnh → tam giác, 3 chân đường cao, 3 đường
+    cao, ký hiệu góc vuông và trực tâm H. Kéo đỉnh → mọi thứ cập nhật theo.
+    Tam giác tù: cạnh được kéo dài tới chân đường cao, đường cao kéo dài tới H.
+    """
+    name = "triangle_altitudes"
+
+    def activate(self):
+        super().activate()
+        self.tm.status_hint.emit("Tam giác + 3 đường cao: click 3 đỉnh")
+
+    def _finish(self):
+        if len(self._pts) < 3:
+            super()._finish()
+            return
+        from items.constructed import FootPointItem
+        from items.on_curve import IntersectionPointItem, anchor_points
+        from items.marks import RightAngleMarkItem
+        pts = list(self._pts)
+        self.history.stack.beginMacro("Tam giác + 3 đường cao")   # 1 bước hoàn tác
+        super()._finish()
+        extra, alts = [], []
+        for k in range(3):
+            a, b, c = pts[k], pts[(k + 1) % 3], pts[(k + 2) % 3]
+            foot = FootPointItem(a, b, c)
+            alt = SegmentItem(a, foot)
+            alts.append(alt)
+            # Cạnh kéo dài tới chân đường cao (trùng cạnh khi chân nằm trong cạnh)
+            far = b if (b.scenePos() - foot.scenePos()).manhattanLength() > \
+                (c.scenePos() - foot.scenePos()).manhattanLength() else c
+            extra += [foot, alt, SegmentItem(foot, b), SegmentItem(foot, c),
+                      RightAngleMarkItem(foot, a, far)]
+        for it in extra:
+            self.scene.addItem(it)
+        # Trực tâm: giao của 2 đường cao (kéo dài nếu cần)
+        from utils.snap_engine import curves_of, intersect_curves
+        ip = intersect_curves(curves_of(alts[0])[0], curves_of(alts[1])[0],
+                              extend=True)
+        if ip:
+            h_pos = ip[0]
+            anchors = anchor_points(self.scene, alts[0])
+            anchors += [p for p in anchor_points(self.scene, alts[1])
+                        if p not in anchors]
+            H = IntersectionPointItem(alts[0], 0, alts[1], 0, h_pos, anchors)
+            self.scene.addItem(H)
+            extra.append(H)
+            for p in pts:                           # đường cao kéo dài tới H
+                seg = SegmentItem(H, p)
+                self.scene.addItem(seg)
+                extra.append(seg)
+        self.history.push_add_batch(self.scene, extra)
+        self.history.stack.endMacro()
+        self.tm.status_hint.emit(
+            "✓ Tam giác + 3 đường cao, trực tâm H — kéo đỉnh, mọi thứ tự cập nhật")

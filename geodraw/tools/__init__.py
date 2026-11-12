@@ -8,7 +8,7 @@ from .segment_tool import SegmentTool
 from .line_tool import LineTool, RayTool
 from .circle_tool import CircleTool
 from .arc_tool import ArcTool
-from .polygon_tool import PolygonTool, TriangleTool
+from .polygon_tool import PolygonTool, TriangleTool, TriangleAltitudesTool
 from .mark_tool import MarkTool
 from .label_tool import LabelTool
 from .ink_tool import InkTool
@@ -68,6 +68,7 @@ class ToolManager(QObject):
             "arc":      mk(ArcTool),
             "polygon":  mk(PolygonTool),
             "triangle": mk(TriangleTool),
+            "triangle_altitudes": mk(TriangleAltitudesTool),
             "mark":     mk(MarkTool),
             "label":    mk(LabelTool),
             "ink":      mk(InkTool),

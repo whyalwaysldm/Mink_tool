@@ -397,7 +397,8 @@ class MainWindow(QMainWindow):
         labels = {
             "select": "↖ Chọn", "point": "• Điểm", "segment": "╱ Đoạn thẳng",
             "line": "━ Đường thẳng", "ray": "→ Tia", "circle": "○ Đường tròn",
-            "arc": "⌒ Cung", "triangle": "△ Tam giác", "polygon": "⬡ Đa giác",
+            "arc": "⌒ Cung", "triangle": "△ Tam giác",
+            "triangle_altitudes": "⟂ Tam giác + 3 đường cao", "polygon": "⬡ Đa giác",
             "mark": "✓ Ký hiệu", "label": "T Nhãn",
             "ink": "✏ Bút vẽ", "erase": "⌫ Xóa",
             # Geometry tools

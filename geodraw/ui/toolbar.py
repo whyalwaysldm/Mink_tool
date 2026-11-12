@@ -57,6 +57,7 @@ TOOLBAR_LAYOUT = [
     ])),
     ("group", ("Tam giác / đa giác", [
         ("triangle",       "△",  "Tam giác (T)"),
+        ("triangle_altitudes", "⟂", "Tam giác + 3 đường cao, trực tâm"),
         ("equilateral_triangle", "▲", "Tam giác đều (F3)"),
         ("isosceles_triangle",   "🔺", "Tam giác cân (F6)"),
         ("right_triangle",       "◺", "Tam giác vuông (F4)"),

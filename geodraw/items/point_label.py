@@ -20,6 +20,51 @@ DEFAULT_FONT_SIZE = 9   # cỡ chữ tên điểm / tên đường
 LABEL_GAP = 4.4   # px — khoảng cách từ tâm điểm tới mép chữ khi tự đặt
 
 
+SUB_SCALE = 0.68     # cỡ chữ chỉ số dưới so với chữ chính
+SUB_DROP = 0.28      # chỉ số hạ xuống bao nhiêu (theo ascent chữ chính)
+_SUB_DIGITS = str.maketrans("0123456789+-=()", "₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎")
+
+
+def split_subscripts(text: str) -> list:
+    """
+    "A_1" → [("A", False), ("1", True)].  Sau "_": "{...}" lấy cả cụm,
+    dãy chữ số lấy hết các số liền nhau, còn lại lấy đúng 1 ký tự.
+    """
+    runs, buf, i = [], "", 0
+    while i < len(text):
+        ch = text[i]
+        if ch == "_" and i + 1 < len(text):
+            if buf:
+                runs.append((buf, False))
+                buf = ""
+            j = i + 1
+            if text[j] == "{":
+                k = text.find("}", j)
+                k = len(text) if k < 0 else k
+                sub, i = text[j + 1:k], k + 1
+            elif text[j].isdigit():
+                k = j
+                while k < len(text) and text[k].isdigit():
+                    k += 1
+                sub, i = text[j:k], k
+            else:
+                sub, i = text[j], j + 1
+            if sub:
+                runs.append((sub, True))
+            continue
+        buf += ch
+        i += 1
+    if buf:
+        runs.append((buf, False))
+    return runs
+
+
+def plain_name(text: str) -> str:
+    """Tên để hiện trong hộp thoại / thanh trạng thái: A_1 → A₁."""
+    return "".join(r.translate(_SUB_DIGITS) if sub else r
+                   for r, sub in split_subscripts(text))
+
+
 class PointLabelItem(GeoItem):
 
     def __init__(self, point: PointItem, text: str,
@@ -84,7 +129,8 @@ class PointLabelItem(GeoItem):
     def _offset_towards(self, d: tuple) -> QPointF:
         """Offset (baseline-trái) để tâm chữ nằm cách điểm LABEL_GAP theo hướng d."""
         fm = QFontMetricsF(self._font())
-        w, asc = fm.horizontalAdvance(self._text or "A"), fm.ascent()
+        w, asc = self._text_width() if self._text else fm.horizontalAdvance("A"), \
+            fm.ascent()
         # Lùi thêm theo kích thước chữ để chữ không đè lên điểm / đường
         gap = LABEL_GAP + abs(d[0]) * w / 2 + abs(d[1]) * asc * 0.35
         cx, cy = d[0] * gap, d[1] * gap
@@ -166,13 +212,35 @@ class PointLabelItem(GeoItem):
         f.setItalic(True)
         return f
 
+    def _sub_font(self) -> QFont:
+        f = QFont(self._font_family)
+        f.setPointSizeF(max(4.0, self._font_size * SUB_SCALE))
+        f.setItalic(False)              # chỉ số (số thứ tự) viết đứng
+        return f
+
+    def _runs(self) -> list:
+        """[(chuỗi, là chỉ số dưới, x bắt đầu)] — x tính từ baseline-trái."""
+        fm, fs = QFontMetricsF(self._font()), QFontMetricsF(self._sub_font())
+        out, x = [], 0.0
+        for text, sub in split_subscripts(self._text):
+            out.append((text, sub, x))
+            x += (fs if sub else fm).horizontalAdvance(text)
+        return out
+
+    def _text_width(self) -> float:
+        fm, fs = QFontMetricsF(self._font()), QFontMetricsF(self._sub_font())
+        return sum((fs if sub else fm).horizontalAdvance(t)
+                   for t, sub in split_subscripts(self._text))
+
     def boundingRect(self) -> QRectF:
         if not self._text:
             return QRectF(-2, -2, 4, 4)
         fm  = QFontMetricsF(self._font())
-        w   = fm.horizontalAdvance(self._text)
+        w   = self._text_width()
         asc = fm.ascent()
         des = fm.descent()
+        if any(sub for _, sub in split_subscripts(self._text)):
+            des = max(des, asc * SUB_DROP + QFontMetricsF(self._sub_font()).descent())
         pad = 3
         return QRectF(-pad, -(asc + pad), w + pad * 2, asc + des + pad * 2)
 
@@ -186,10 +254,12 @@ class PointLabelItem(GeoItem):
                 self.boundingRect(),
                 QColor(0, 120, 215, 28))
         color = QColor(0, 90, 200) if selected else QColor(20, 20, 20)
-        painter.setFont(self._font())
         painter.setPen(QPen(color, 1.0))
-        # drawText với baseline tại (0, 0)
-        painter.drawText(QPointF(0, 0), self._text)
+        # Baseline tại (0, 0); chỉ số dưới (A_1) nhỏ hơn và hạ xuống
+        drop = QFontMetricsF(self._font()).ascent() * SUB_DROP
+        for text, sub, x in self._runs():
+            painter.setFont(self._sub_font() if sub else self._font())
+            painter.drawText(QPointF(x, drop if sub else 0.0), text)
 
 
 # ── Tự chọn hướng đặt nhãn ───────────────────────────────────────────────────
@@ -402,4 +472,4 @@ def vertex_names(points: list) -> list:
         names.append(name)
     used = set(n for n in names if n)
     letters = (c for c in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" if c not in used)
-    return [n or next(letters, "?") for n in names]
+    return [plain_name(n) if n else next(letters, "?") for n in names]

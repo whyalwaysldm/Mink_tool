@@ -62,7 +62,7 @@ class RenamePointTool(BaseTool):
         point = snapped_item
         existing = self._label_item_of(point)
 
-        name = self._ask("Đặt tên điểm", "Nhập tên điểm (bỏ trống để xóa nhãn):",
+        name = self._ask("Đặt tên điểm", "Nhập tên điểm (A_1 → A₁; bỏ trống để xóa nhãn):",
                          point.label or self._next_label())
         if name is None:
             return

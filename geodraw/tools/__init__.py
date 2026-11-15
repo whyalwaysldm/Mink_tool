@@ -35,6 +35,7 @@ _DEFAULT_SHORTCUTS = {
     "K": "circumcircle", "N": "rename_point",
     "D": "measure",
     "Q": "parallel", "W": "perpendicular", "O": "compass",
+    "Z": "perpendicular",   # dự phòng: bộ gõ Telex (Unikey) biến W thành ư
     "U": "tangent_circle", "Y": "tangent_lines", "X": "common_tangent",
     # Hình preset
     "F1": "rectangle", "F2": "square",

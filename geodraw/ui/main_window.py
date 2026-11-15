@@ -20,6 +20,21 @@ from export.file_export import save_png, save_svg, save_pdf
 from utils.tablet import EraserAutoSwitch
 
 
+def _typed_letter(text: str) -> str:
+    """
+    Bộ gõ tiếng Việt (Unikey – Telex) có thể biến phím chữ thành ký tự khác,
+    vd. W → ư, AA → â. Đổi ngược về phím chữ gốc để phím tắt vẫn chạy.
+    """
+    import unicodedata
+    if len(text) != 1:
+        return ""
+    special = {"ư": "W", "Ư": "W", "đ": "D", "Đ": "D", "ơ": "O", "Ơ": "O"}
+    if text in special:
+        return special[text]
+    base = unicodedata.normalize("NFD", text)[0].upper()
+    return base if "A" <= base <= "Z" else ""
+
+
 class _Session:
     """Một phiên làm việc (1 tab): vùng vẽ + lịch sử hoàn tác riêng."""
 
@@ -460,7 +475,7 @@ class MainWindow(QMainWindow):
         if mod & Qt.KeyboardModifier.AltModifier:
             parts.append("Alt")
 
-        key_name = self._key_name(key)
+        key_name = self._key_name(key) or _typed_letter(event.text())
         if key_name:
             parts.append(key_name)
         key_str = "+".join(parts) if parts else ""

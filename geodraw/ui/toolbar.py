@@ -44,7 +44,7 @@ TOOLBAR_LAYOUT = [
         None,
         ("angle_bisector", "∠",  "Phân giác góc (J)"),
         ("parallel",       "∥",  "Đường song song qua 1 điểm (Q)"),
-        ("perpendicular",  "⊥",  "Đường vuông góc qua 1 điểm (W)"),
+        ("perpendicular",  "⊥",  "Đường vuông góc qua 1 điểm (W hoặc Z)"),
     ])),
     ("group", ("Đường tròn", [
         ("circle",         "○",  "Đường tròn (C)"),

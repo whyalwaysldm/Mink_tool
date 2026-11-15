@@ -146,6 +146,10 @@ def polygon_at_vertex(pt):
         if isinstance(d, ShapeItem) and d.kind in ANGLE_KINDS \
                 and d.scene() is not None and pt in d.points:
             return d, d.points.index(pt)
+        # Tam giác vuông: góc vuông ở đỉnh 0 cố định, 2 góc nhọn đổi được
+        if isinstance(d, ShapeItem) and d.kind == "right_triangle" \
+                and d.scene() is not None and pt in d.points[1:]:
+            return d, d.points.index(pt)
     return None
 
 
@@ -197,6 +201,20 @@ def angle_targets(kind: str, pts: list, k: int, val: float):
     n = len(pts)
     o = _orientation(pts)
     out = list(pts)
+    if kind == "right_triangle":
+        # Góc vuông tại đỉnh 0; đặt góc nhọn tại k: đỉnh 0 và k đứng yên,
+        # đỉnh nhọn kia trượt trên cạnh góc vuông của nó
+        if k not in (1, 2) or not 0.05 < val < 89.95:
+            return None
+        o_ = 3 - k
+        leg_k = pts[k] - pts[0]
+        lk = math.hypot(leg_k.x(), leg_k.y())
+        leg_o = pts[o_] - pts[0]
+        lo = math.hypot(leg_o.x(), leg_o.y())
+        if lk < 1e-9 or lo < 1e-9:
+            return None
+        out[o_] = pts[0] + leg_o * (lk * math.tan(math.radians(val)) / lo)
+        return out
     if kind in _SIDE_KINDS:
         nxt = _turn(pts[k], pts[k - 1], pts[(k + 1) % n], -o * val)
         if nxt is None:
@@ -258,7 +276,11 @@ def edit_vertex_angle(poly, k: int, scene, history) -> bool:
     pts = [p.scenePos() for p in items]
     cur = interior_angle(pts, k)
     hi = 359.9 if (poly.kind == "polygon" and n > 3) else 179.9
-    if poly.kind in ("polygon", "triangle"):
+    if poly.kind == "right_triangle":
+        hi = 89.9
+        how = (f" (giữ nguyên {names[0]}, {names[k]}; "
+               f"di chuyển {names[3 - k]})")
+    elif poly.kind in ("polygon", "triangle"):
         how = (f" (di chuyển {names[(k + 1) % n]}, "
                f"giữ nguyên góc tại {names[(k + 2) % n]})")
     else:

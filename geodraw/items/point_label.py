@@ -173,6 +173,7 @@ class PointLabelItem(GeoItem):
                     self._point.add_dependent(self)
                 self._point.label = self._text
                 self._point._label_item = self
+                self.setVisible(not getattr(self._point, '_is_hidden', False))
             return value
 
         # ── Clamp khi người dùng kéo (không phải point kéo nhãn đi) ────

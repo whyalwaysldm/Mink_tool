@@ -53,7 +53,7 @@ def snap(pos: QPointF, scene, exclude=None) -> SnapResult:
     for item in scene.items():
         if not isinstance(item, PointItem):
             continue
-        if item is exclude or not item.isVisible():
+        if item is exclude or not item.isVisible() or item._is_hidden:
             continue
         d = distance(pos, item.scenePos())
         if d < best_d:

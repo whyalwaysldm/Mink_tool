@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QGraphicsItem
-from PyQt6.QtGui import QPainter, QPen, QBrush, QColor
+from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QPainterPath
 from PyQt6.QtCore import QRectF, QPointF, Qt
 from .base import GeoItem
 
@@ -50,7 +50,25 @@ class PointItem(GeoItem):
         r = self._radius + 2
         return QRectF(-r, -r, r * 2, r * 2)
 
+    # ── Giấu điểm: vẫn tồn tại (hình dựng từ nó vẫn đúng) nhưng không vẽ,
+    #    không click / bắt dính được; tên điểm cũng giấu theo ───────────
+    def set_hidden(self, hidden: bool):
+        self._is_hidden = hidden
+        self.setOpacity(1.0)
+        self.prepareGeometryChange()
+        self.update()
+        if self._label_item is not None:
+            self._label_item.setVisible(not hidden)
+
+    def shape(self) -> QPainterPath:
+        path = QPainterPath()
+        if not self._is_hidden:
+            path.addRect(self.boundingRect())
+        return path
+
     def paint(self, painter: QPainter, option, widget=None):
+        if self._is_hidden:
+            return
         selected = self.isSelected()
         color = QColor(0, 120, 215) if selected else self.color
         painter.setPen(QPen(color, 1.5))

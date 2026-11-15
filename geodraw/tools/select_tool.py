@@ -231,9 +231,22 @@ class SelectTool(BaseTool):
             label = "Số đo cạnh / đường chéo…" if quad.kind == "rhombus"                 else "Số đo cạnh…"
             menu.addAction(label).triggered.connect(
                 lambda: edit_shape_sides(quad, self.scene, self.history))
+        if pt is not None and not pt._is_hidden:
+            name = f" {pt.label}" if pt.label else ""
+            menu.addAction(f"Giấu điểm{name}").triggered.connect(
+                lambda: self._hide_points([pt]))
         add_mark_actions(menu, self.scene, self.history, pos, hits,
                          on_change=self.tm.status_hint.emit)
         menu.exec(QCursor.pos())
+
+    def _hide_points(self, pts: list):
+        """Giấu điểm (vẫn tồn tại, không hiển thị) — hoàn tác được."""
+        self.history.push_visibility(pts, True)
+        for p in pts:
+            p.setSelected(False)
+        self.tm.status_hint.emit(
+            f"✓ Đã giấu {len(pts)} điểm — Sửa > Hiện các điểm đã giấu "
+            "(Ctrl+Shift+H) để hiện lại")
 
     # ── Kéo cả vùng chọn: di chuyển cứng (giữ nguyên hình dạng) ──────
 

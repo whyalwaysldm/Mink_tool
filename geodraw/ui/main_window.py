@@ -205,6 +205,13 @@ class MainWindow(QMainWindow):
         act_show_all.triggered.connect(self._show_all_hidden)
         edit_menu.addAction(act_show_all)
 
+        self._act_show_pts = QAction("Hiện các điểm đã giấu (Ctrl+Shift+H)", self)
+        self._act_show_pts.setShortcut("Ctrl+Shift+H")
+        self._act_show_pts.setToolTip("Hiện lại tất cả các điểm đã giấu")
+        self._act_show_pts.triggered.connect(self._show_hidden_points)
+        edit_menu.addAction(self._act_show_pts)
+        self._style_bar.addAction(self._act_show_pts)
+
         edit_menu.addSeparator()
         act_clear = QAction("Xóa tất cả", self)
         act_clear.triggered.connect(self._clear_all)
@@ -366,6 +373,17 @@ class MainWindow(QMainWindow):
                 f"✓ Đã hiện {len(hidden)} đối tượng bị ẩn", 2500)
         else:
             self.statusBar().showMessage("Không có đối tượng nào đang bị ẩn", 2000)
+
+    def _show_hidden_points(self):
+        """Hiện lại mọi điểm đã giấu (hoàn tác được)."""
+        from items.point import PointItem
+        pts = [it for it in self._scene.items()
+               if isinstance(it, PointItem) and it._is_hidden]
+        if pts:
+            self._history.push_visibility(pts, False)
+            self.statusBar().showMessage(f"✓ Đã hiện lại {len(pts)} điểm", 2500)
+        else:
+            self.statusBar().showMessage("Không có điểm nào đang bị giấu", 2000)
 
     def _clear_all(self):
         self._scene.clear()
